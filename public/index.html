@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vaste Lasten</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-title">Vaste Lasten</div>
+
+    <nav class="sidebar-nav">
+      <button class="active" onclick="toonPagina('dashboard', this)">Dashboard</button>
+    </nav>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Beheer</div>
+      <nav class="sidebar-nav">
+        <button onclick="openModalImport()">Importeer CSV</button>
+        <button onclick="openModalInstellingen()">Instellingen</button>
+      </nav>
+    </div>
+
+  </aside>
+
+  <!-- CONTENT -->
+  <main>
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <div class="card" style="margin-bottom:16px;padding:12px 16px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="jaar-select" onchange="filterPeriodesByJaar()" style="width:auto;min-width:70px"></select>
+          <select id="periode-select" onchange="laadDashboard()" style="width:auto;min-width:190px"></select>
+          <select id="categorie-filter" onchange="filterDashboard()" style="width:auto;min-width:150px">
+            <option value="">Alle categorieën</option>
+          </select>
+          <input type="text" id="dashboard-zoek" placeholder="Zoek op naam of bedrag…" oninput="filterDashboard()" style="flex:1;min-width:180px">
+        </div>
+      </div>
+
+      <div class="totalen" id="totalen" style="display:none">
+        <div class="totaal-item verwacht">
+          <div class="label">Totaal verwacht</div>
+          <div class="bedrag" id="tot-verwacht">—</div>
+        </div>
+        <div class="totaal-item betaald">
+          <div class="label">Afgeschreven</div>
+          <div class="bedrag" id="tot-betaald">—</div>
+        </div>
+        <div class="totaal-item open">
+          <div class="label">Nog open</div>
+          <div class="bedrag" id="tot-open">—</div>
+        </div>
+      </div>
+
+      <div class="grafieken-grid" id="dashboard-grafieken" style="display:none;margin-bottom:16px">
+        <div class="card">
+          <h3 class="chart-titel">Verdeling per categorie</h3>
+          <div class="chart-wrap"><canvas id="chart-categorie"></canvas></div>
+        </div>
+        <div class="card">
+          <h3 class="chart-titel">Verwacht vs betaald per periode</h3>
+          <div class="chart-wrap"><canvas id="chart-periodes"></canvas></div>
+        </div>
+      </div>
+
+      <div id="dashboard-acties" style="display:none;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        <button class="btn-dash-actie btn-dash-primary" onclick="openModalLast()">+ Vaste Last</button>
+      </div>
+
+      <div class="card" id="dashboard-card">
+        <div class="empty">Selecteer of maak een periode aan om te beginnen.</div>
+      </div>
+
+      <div id="inactieve-lasten-sectie" style="display:none;margin-top:16px">
+        <h3 style="font-size:14px;font-weight:600;color:#6b7280;margin-bottom:12px">Inactieve vaste lasten</h3>
+        <div class="card">
+          <table>
+            <thead><tr><th>Naam</th><th>Bedrag</th><th>Categorie</th><th></th></tr></thead>
+            <tbody id="inactieve-lasten-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TRANSACTIES ZOEKEN -->
+    <div id="page-transacties" class="page">
+      <div class="card" style="margin-bottom:16px;padding:12px 16px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="transacties-zoek" placeholder="Zoek op omschrijving, IBAN of bedrag…" oninput="zoekTransacties()" style="flex:1;min-width:220px">
+          <select id="transacties-periode-filter" onchange="zoekTransacties()" style="width:auto;min-width:160px">
+            <option value="">Alle periodes</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Datum</th>
+              <th>Omschrijving</th>
+              <th>Bedrag</th>
+              <th>Tegenrekening</th>
+              <th>Periode</th>
+              <th>Gekoppeld aan</th>
+            </tr>
+          </thead>
+          <tbody id="transacties-zoek-body">
+            <tr><td colspan="6" class="empty">Voer een zoekterm in of selecteer een periode.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- VASTE LASTEN -->
+    <div id="page-lasten" class="page">
+      <div class="toolbar">
+        <h2 style="flex:1">Vaste Lasten</h2>
+        <button class="btn btn-primary" onclick="openModalLast()">+ Toevoegen</button>
+      </div>
+      <div class="card">
+        <table id="lasten-tabel">
+          <thead>
+            <tr>
+              <th>Naam</th>
+              <th>Bedrag</th>
+              <th>Categorie</th>
+              <th>Dag</th>
+              <th>Actief</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="lasten-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PERIODES -->
+    <div id="page-periodes" class="page">
+      <div class="toolbar">
+        <h2 style="flex:1">Periodes</h2>
+        <button class="btn btn-primary" onclick="openModalPeriode()">+ Nieuwe periode</button>
+      </div>
+      <div class="card">
+        <table id="periodes-tabel">
+          <thead>
+            <tr>
+              <th>Start</th>
+              <th>Einde</th>
+              <th>Salaris</th>
+              <th>Notities</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="periodes-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+
+
+  </main>
+</div>
+
+<!-- MODAL: Vaste last -->
+<div class="modal-overlay" id="modal-last">
+  <div class="modal">
+    <h3 id="modal-last-titel">Vaste last toevoegen</h3>
+    <form id="form-last" onsubmit="submitLast(event)">
+      <input type="hidden" id="last-id">
+      <div class="form-grid">
+        <div class="full">
+          <label>Naam *</label>
+          <input type="text" id="last-naam" required>
+        </div>
+        <div>
+          <label>Bedrag (€) *</label>
+          <input type="number" id="last-bedrag" step="0.01" min="0" required>
+        </div>
+        <div>
+          <label>Verwachte dag (1-31)</label>
+          <input type="number" id="last-dag" min="1" max="31">
+        </div>
+        <div>
+          <label>Categorie</label>
+          <input type="text" id="last-categorie" placeholder="bijv. Wonen, Abonnementen">
+        </div>
+        <div>
+          <label>IBAN tegenrekening</label>
+          <input type="text" id="last-iban" placeholder="NL00 BANK 0000 0000 00">
+        </div>
+        <div class="full">
+          <label>Omschrijving patroon (tekst of regex)</label>
+          <input type="text" id="last-patroon" placeholder="bijv. Netflix of ^SEPA.*ziggo">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="sluitModal('modal-last')">Annuleren</button>
+        <button type="submit" class="btn btn-primary">Opslaan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: Nieuwe vaste last vanuit transactie -->
+<div class="modal-overlay" id="modal-nieuwe-last-transactie">
+  <div class="modal">
+    <h3>Nieuwe vaste last aanmaken</h3>
+    <form id="form-nieuwe-last-transactie" onsubmit="submitNieuweLastVanTransactie(event)">
+      <input type="hidden" id="nltv-transactie-id">
+      <div class="form-grid">
+        <div class="full">
+          <label>Naam *</label>
+          <input type="text" id="nltv-naam" required>
+        </div>
+        <div>
+          <label>Bedrag (€) *</label>
+          <input type="number" id="nltv-bedrag" step="0.01" min="0" required>
+        </div>
+        <div>
+          <label>Verwachte dag (1-31)</label>
+          <input type="number" id="nltv-dag" min="1" max="31">
+        </div>
+        <div>
+          <label>Categorie</label>
+          <input type="text" id="nltv-categorie" placeholder="bijv. Wonen, Abonnementen">
+        </div>
+        <div>
+          <label>IBAN tegenrekening</label>
+          <input type="text" id="nltv-iban">
+        </div>
+        <div class="full">
+          <label>Omschrijving patroon</label>
+          <input type="text" id="nltv-patroon">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="sluitModal('modal-nieuwe-last-transactie')">Annuleren</button>
+        <button type="submit" class="btn btn-primary">Aanmaken &amp; koppelen</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: Periode -->
+<div class="modal-overlay" id="modal-periode">
+  <div class="modal">
+    <h3 id="modal-periode-titel">Nieuwe periode</h3>
+    <form id="form-periode" onsubmit="submitPeriode(event)">
+      <input type="hidden" id="periode-id">
+      <div class="form-grid">
+        <div>
+          <label>Startdatum (salarisdatum) *</label>
+          <input type="date" id="periode-start" required onchange="vulEinddatumIn(this.value)">
+        </div>
+        <div>
+          <label>Einddatum *</label>
+          <input type="date" id="periode-eind" required>
+        </div>
+        <div>
+          <label>Salaris bedrag (€)</label>
+          <input type="number" id="periode-salaris" step="0.01" min="0">
+        </div>
+        <div>
+          <label>Notities</label>
+          <input type="text" id="periode-notities">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="sluitModal('modal-periode')">Annuleren</button>
+        <button type="submit" class="btn btn-primary">Opslaan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: Zoek transactie -->
+<div class="modal-overlay" id="modal-zoek-transactie">
+  <div class="modal" style="width:700px">
+    <h3>Koppel transactie aan <span id="zoek-last-naam"></span></h3>
+    <input type="hidden" id="zoek-last-id">
+    <input type="text" id="zoek-filter" placeholder="Zoeken op omschrijving of tegenrekening..." oninput="filterZoekTransacties()" style="margin-bottom:12px">
+    <div class="import-preview">
+      <table>
+        <thead><tr><th>Datum</th><th>Omschrijving</th><th>Bedrag</th><th>Tegenrekening</th><th></th></tr></thead>
+        <tbody id="zoek-transacties-body"></tbody>
+      </table>
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn btn-secondary" onclick="sluitModal('modal-zoek-transactie')">Sluiten</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Import -->
+<div class="modal-overlay" id="modal-import">
+  <div class="modal" style="width:700px">
+    <h3>Bankafschrift importeren</h3>
+    <div id="import-stap1">
+      <p style="color:#6b7280;margin-bottom:12px;font-size:13px">
+        Upload een CSV-export van je bank (ING, ABN AMRO, Rabobank). Transacties worden automatisch gekoppeld aan vaste lasten.
+      </p>
+      <label>CSV bestand</label>
+      <input type="file" id="import-file" accept=".csv,.txt" style="margin-bottom:12px">
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="sluitModal('modal-import')">Annuleren</button>
+        <button type="button" class="btn btn-primary" onclick="previewImport()">Bekijk preview</button>
+      </div>
+    </div>
+    <div id="import-stap2" style="display:none">
+      <p id="import-samenvatting" style="margin-bottom:8px;font-size:13px"></p>
+      <div class="import-preview">
+        <table>
+          <thead><tr><th>Datum</th><th>Omschrijving</th><th>Bedrag</th><th>Tegenrekening</th></tr></thead>
+          <tbody id="import-preview-body"></tbody>
+        </table>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('import-stap2').style.display='none';document.getElementById('import-stap1').style.display='block'">Terug</button>
+        <button type="button" class="btn btn-primary" onclick="slaImportOp()">Importeren &amp; matchen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Instellingen -->
+<div class="modal-overlay" id="modal-instellingen">
+  <div class="modal" style="width:500px">
+    <h3>⚙ Instellingen</h3>
+
+    <div style="margin-bottom:20px">
+      <label>Salaris dag van de maand</label>
+      <input type="number" id="inst-salaris-dag" min="1" max="31" placeholder="bijv. 25" style="width:100px;margin-top:4px">
+      <p style="font-size:12px;color:#6b7280;margin-top:4px">De dag waarop je salaris binnenkomt. Wordt gebruikt bij het automatisch aanmaken van periodes.</p>
+    </div>
+
+    <div style="border-top:1px solid #f3f4f6;padding-top:16px;margin-bottom:16px">
+      <label>Periodes genereren voor jaar</label>
+      <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
+        <input type="number" id="inst-genereer-jaar" min="2020" max="2100" style="width:110px">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="genereerPeriodes()">Genereer 12 periodes</button>
+      </div>
+      <p style="font-size:12px;color:#6b7280;margin-top:4px">Maakt automatisch 12 periodes aan op basis van de salaris dag hierboven.</p>
+    </div>
+
+    <div style="border-top:1px solid #f3f4f6;padding-top:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <label style="margin-bottom:0">Bestaande periodes</label>
+      </div>
+      <div style="max-height:200px;overflow-y:auto">
+        <table style="font-size:12px">
+          <thead><tr><th>Start</th><th>Einde</th><th></th></tr></thead>
+          <tbody id="inst-periodes-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn-secondary" onclick="sluitModal('modal-instellingen')">Sluiten</button>
+      <button type="button" class="btn btn-primary" onclick="slaInstellingenOp()">Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: December reminder -->
+<div class="modal-overlay" id="modal-december">
+  <div class="modal" style="width:420px">
+    <h3>📅 Nieuw jaar aanmaken</h3>
+    <p style="color:#374151;margin-bottom:8px">Het is december! Wil je alvast de periodes voor <strong id="december-jaar-tekst"></strong> aanmaken?</p>
+    <p style="font-size:13px;color:#6b7280;margin-bottom:20px">De salaris dag uit de instellingen wordt gebruikt. Je kunt dit ook later doen via ⚙ Instellingen.</p>
+    <div class="form-actions">
+      <button type="button" class="btn btn-secondary" onclick="sluitModal('modal-december')">Later</button>
+      <button type="button" class="btn btn-primary" onclick="decemberGenereer()">Aanmaken</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Match detail -->
+<div class="modal-overlay" id="modal-match-detail">
+  <div class="modal" style="width:480px">
+    <h3>Match detail — <span id="match-detail-naam" style="font-weight:400;color:#6b7280"></span></h3>
+    <div id="match-detail-inhoud"></div>
+    <div class="form-actions">
+      <button type="button" class="btn btn-danger" id="btn-match-ongedaan" onclick="matchOngedaanVanuitDetail()">Match ongedaan maken</button>
+      <button type="button" class="btn btn-secondary" onclick="sluitModal('modal-match-detail')">Sluiten</button>
+    </div>
+  </div>
+</div>
+
+<script src="chart.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

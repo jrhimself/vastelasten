@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Bon/rekening -->
+  <rect x="5" y="2" width="22" height="26" rx="2" fill="#1a73e8"/>
+  <!-- Golvende onderkant (kassabon effect) -->
+  <path d="M5 25 Q8 28 11 25 Q14 22 17 25 Q20 28 23 25 Q26 22 27 25 L27 28 Q24 31 21 28 Q18 25 15 28 Q12 31 9 28 Q6 25 5 28 Z" fill="#fff"/>
+  <!-- Lijntjes (regels op bon) -->
+  <rect x="9" y="7" width="9" height="2" rx="1" fill="#fff" opacity="0.9"/>
+  <rect x="9" y="11" width="14" height="2" rx="1" fill="#fff" opacity="0.6"/>
+  <rect x="9" y="15" width="11" height="2" rx="1" fill="#fff" opacity="0.6"/>
+  <!-- Euro teken -->
+  <text x="20" y="21" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#fff" text-anchor="middle">€</text>
+</svg>
