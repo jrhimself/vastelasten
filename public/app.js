@@ -1012,7 +1012,45 @@ async function decemberGenereer() {
 // ============================================================
 // INIT
 // ============================================================
-async function init() {
+// ===== Auth =====
+
+async function checkAuth() {
+  try {
+    const r = await fetch('/api/auth/check');
+    const data = await r.json();
+    return data.authenticated;
+  } catch {
+    return false;
+  }
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const password = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+  errorEl.style.display = 'none';
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    if (!r.ok) {
+      const data = await r.json();
+      errorEl.textContent = data.error || 'Inloggen mislukt';
+      errorEl.style.display = 'block';
+      return;
+    }
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-layout').style.display = '';
+    await startApp();
+  } catch {
+    errorEl.textContent = 'Verbindingsfout';
+    errorEl.style.display = 'block';
+  }
+}
+
+async function startApp() {
   await Promise.all([laadLasten(), laadPeriodes(), laadInstellingen()]);
 
   if (allPeriodes.length) {
@@ -1031,6 +1069,17 @@ async function init() {
     const volgendJaar = nu.getFullYear() + 1;
     const heeftVolgendJaar = allPeriodes.some(p => p.start_datum.startsWith(String(volgendJaar)));
     if (!heeftVolgendJaar) setTimeout(() => toonDecemberPopup(volgendJaar), 800);
+  }
+}
+
+async function init() {
+  const authenticated = await checkAuth();
+  if (authenticated) {
+    document.getElementById('app-layout').style.display = '';
+    await startApp();
+  } else {
+    document.getElementById('login-screen').style.display = '';
+    document.getElementById('app-layout').style.display = 'none';
   }
 }
 
