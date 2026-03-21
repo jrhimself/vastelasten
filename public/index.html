@@ -9,7 +9,20 @@
 </head>
 <body>
 
-<div class="layout">
+<!-- LOGIN -->
+<div id="login-screen" class="login-screen" style="display:none">
+  <div class="login-card">
+    <h2>Vaste Lasten</h2>
+    <p class="login-subtitle">Voer je wachtwoord in om verder te gaan</p>
+    <form id="login-form" onsubmit="handleLogin(event)">
+      <input type="password" id="login-password" placeholder="Wachtwoord" required autofocus>
+      <div id="login-error" class="login-error" style="display:none"></div>
+      <button type="submit" class="btn btn-primary" style="width:100%">Inloggen</button>
+    </form>
+  </div>
+</div>
+
+<div class="layout" id="app-layout" style="display:none">
 
   <!-- SIDEBAR -->
   <aside class="sidebar">

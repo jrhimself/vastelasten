@@ -1,3 +1,37 @@
+// ===== Auth helpers =====
+
+async function hmacSign(message, secret) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
+  return [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function createSessionToken(secret) {
+  const expires = Date.now() + 90 * 24 * 60 * 60 * 1000; // 90 dagen
+  const payload = `session:${expires}`;
+  const signature = await hmacSign(payload, secret);
+  return `${payload}:${signature}`;
+}
+
+async function verifySessionToken(token, secret) {
+  if (!token) return false;
+  const parts = token.split(':');
+  if (parts.length !== 3) return false;
+  const [prefix, expires, signature] = parts;
+  const payload = `${prefix}:${expires}`;
+  const expected = await hmacSign(payload, secret);
+  if (signature !== expected) return false;
+  if (Date.now() > parseInt(expires)) return false;
+  return true;
+}
+
+function getCookie(request, name) {
+  const header = request.headers.get('Cookie') || '';
+  const match = header.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match ? match[1] : null;
+}
+
 // ===== autoMatch (inlined from routes/automatch.js) =====
 
 function autoMatch(transactie, lasten, periode) {
@@ -859,6 +893,56 @@ export async function onRequest(context) {
 
   if (method === 'OPTIONS') {
     return new Response(null, { status: 204 });
+  }
+
+  const authSecret = env.AUTH_SECRET;
+  const authPassword = env.AUTH_PASSWORD;
+
+  // Login endpoint — geen auth nodig
+  if (path === '/auth/login' && method === 'POST') {
+    if (!authPassword || !authSecret) {
+      return Response.json({ error: 'Auth niet geconfigureerd' }, { status: 500 });
+    }
+    const body = await request.json();
+    if (body.password !== authPassword) {
+      return Response.json({ error: 'Onjuist wachtwoord' }, { status: 401 });
+    }
+    const token = await createSessionToken(authSecret);
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': `session=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${90 * 24 * 60 * 60}`,
+      },
+    });
+  }
+
+  // Auth check endpoint
+  if (path === '/auth/check' && method === 'GET') {
+    if (!authSecret) return Response.json({ authenticated: true });
+    const token = getCookie(request, 'session');
+    const valid = await verifySessionToken(token, authSecret);
+    return Response.json({ authenticated: valid });
+  }
+
+  // Logout endpoint
+  if (path === '/auth/logout' && method === 'POST') {
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Set-Cookie': 'session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0',
+      },
+    });
+  }
+
+  // Auth middleware — alle andere endpoints
+  if (authSecret && authPassword) {
+    const token = getCookie(request, 'session');
+    const valid = await verifySessionToken(token, authSecret);
+    if (!valid) {
+      return Response.json({ error: 'Niet ingelogd' }, { status: 401 });
+    }
   }
 
   try {
