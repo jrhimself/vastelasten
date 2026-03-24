@@ -488,6 +488,11 @@ async function hermatchenLast(lastId) {
   }
 }
 
+function geselecteerdeItems() {
+  // Returns checked rows from the dashboard table; empty array = match all
+  return [...document.querySelectorAll('.last-checkbox:checked')].map(cb => ({ id: parseInt(cb.dataset.id) }));
+}
+
 async function bulkHermatchen() {
   try {
     const geselecteerd = geselecteerdeItems();
