@@ -5,8 +5,9 @@ Een persoonlijke financiële web-app om vaste lasten bij te houden, bankafschrif
 ## Features
 
 - **Dashboard** — Overzicht van je vaste lasten per periode met status (betaald, open, overgeslagen)
+- **Afwijkingsmarkering** — Rijen worden geel gemarkeerd als het afgeschreven bedrag afwijkt van het verwachte bedrag
 - **Bankimport** — CSV-import van ING, ABN AMRO en Rabobank met automatische herkenning
-- **Automatische matching** — Transacties worden gekoppeld aan vaste lasten op basis van IBAN, omschrijving of bedrag
+- **Automatische matching** — Transacties worden gekoppeld aan vaste lasten op basis van IBAN, omschrijving of bedrag (alleen afschrijvingen)
 - **Periodes** — Budgetperiodes op basis van je salarisdag, automatisch genereerbaar per jaar
 - **Categorieën** — Groepeer je vaste lasten en bekijk de verdeling in grafieken
 - **Statistieken** — Taartdiagram per categorie en staafdiagram per periode
@@ -19,20 +20,29 @@ Een persoonlijke financiële web-app om vaste lasten bij te houden, bankafschrif
 | Backend | Cloudflare Workers (Pages Functions) |
 | Database | Cloudflare D1 (SQLite) |
 | Hosting | Cloudflare Pages |
-| CI/CD | GitHub Actions |
+| CI/CD | GitHub Actions (test → deploy) |
+| Tests | Vitest |
 
 ## Projectstructuur
 
 ```
 ├── functions/api/[[route]].js   # API handler (serverless)
+├── lib/
+│   ├── automatch.js             # Match-logica (geëxporteerd voor tests)
+│   └── csv.js                  # CSV parsing (geëxporteerd voor tests)
 ├── public/
 │   ├── index.html               # Single-page app
 │   ├── app.js                   # Frontend logica
 │   ├── style.css                # Styling
 │   └── chart.min.js             # Chart.js library
+├── test/
+│   ├── automatch.test.js        # Unit tests voor match-logica
+│   └── csv.test.js              # Unit tests voor CSV parsing
 ├── schema.sql                   # Database schema
 ├── wrangler.toml                # Cloudflare configuratie
-└── .github/workflows/deploy.yml # Deploy pipeline
+└── .github/
+    ├── workflows/deploy.yml     # CI/CD pipeline (test → deploy)
+    └── pull_request_template.md # PR template
 ```
 
 ## Lokaal ontwikkelen
@@ -48,16 +58,36 @@ Dit start een lokale dev-server met een lokale D1-database. Bij de eerste keer m
 npx wrangler d1 execute vaste-lasten-db --local --file=schema.sql
 ```
 
+## Tests
+
+```bash
+npm test
+```
+
+Draait 37 unit tests met Vitest voor de match-logica en CSV parsing.
+
 ## Deployment
 
-De app wordt automatisch gedeployd naar Cloudflare Pages bij een push naar `master`. De GitHub Actions workflow:
+De app wordt automatisch gedeployd naar Cloudflare Pages bij een push naar elke branch. De GitHub Actions workflow:
 
-1. Installeert dependencies (`npm ci`)
-2. Deployt via `wrangler-action@v3` naar Cloudflare Pages
+1. **test** — Draait alle unit tests (`npm test`)
+2. **deploy** — Deployt via `wrangler-action@v3` naar Cloudflare Pages (alleen als tests slagen)
+
+Feature branches krijgen een preview URL (`https://feature-vX-Y-Z.vaste-lasten.pages.dev`). Mergen naar `main` vereist een PR en een geslaagde `test` check.
 
 **Vereiste GitHub Secrets:**
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
+
+## Versioning
+
+Semantische versienummering (semver). Feature branches worden aangemaakt als `feature/vX.Y.Z`:
+
+- **PATCH** (1.0.x) — Bug fixes
+- **MINOR** (1.x.0) — Nieuwe features
+- **MAJOR** (x.0.0) — Breaking changes
+
+De huidige versie is zichtbaar onderaan het sidebar-menu in de app.
 
 ## API Endpoints
 
