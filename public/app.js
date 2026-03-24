@@ -86,9 +86,7 @@ function toonPagina(naam, btn) {
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function sluitModal(id) { document.getElementById(id).classList.remove('open'); }
 
-document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
-});
+// Modals only close via buttons — no click-outside to prevent accidental dismissal on swipe
 
 // ============================================================
 // VASTE LASTEN
