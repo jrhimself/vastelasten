@@ -400,12 +400,14 @@ function renderDashboardTabel() {
     menuItems.push(`<button class="danger" onclick="verwijderLast(${o.id});sluitActiesMenu()">Verwijderen</button>`);
 
     const dimStijl = o.status === 'inactief' ? ' style="opacity:.45"' : '';
+    const bedragAfwijking = o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
+      Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > 0.01;
     const acties = `
       <div class="acties-menu">
         <button class="acties-btn" onclick="toggleActiesMenu(this, event)">•••</button>
         <div class="acties-dropdown">${menuItems.join('')}</div>
       </div>`;
-    return `<tr>
+    return `<tr${bedragAfwijking ? ' class="bedrag-afwijking"' : ''}>
       <td${dimStijl}><strong>${esc(o.naam)}</strong></td>
       <td${dimStijl}>${euro(o.bedrag)}</td>
       <td${dimStijl}>${esc(o.categorie || '—')}</td>
