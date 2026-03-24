@@ -81,7 +81,7 @@ Feature branches krijgen een preview URL (`https://feature-vX-Y-Z.vaste-lasten.p
 
 ## Versioning
 
-Semantische versienummering (semver). Feature branches worden aangemaakt als `feature/vX.Y.Z`:
+Semantische versienummering (semver). Feature branches worden aangemaakt als `feature/vX.Y.Z`. Alle wijzigingen worden bijgehouden in [`CHANGELOG.md`](CHANGELOG.md).
 
 - **PATCH** (1.0.x) — Bug fixes
 - **MINOR** (1.x.0) — Nieuwe features
