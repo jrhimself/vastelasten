@@ -260,13 +260,13 @@ function vulPeriodeSelect() {
   }
 }
 
-function filterPeriodesByJaar() {
+function filterPeriodesByJaar(skipDashboard = false) {
   const jaarSel = document.getElementById('jaar-select');
   const periSel = document.getElementById('periode-select');
   const gefilterd = allPeriodes.filter(p => p.start_datum.startsWith(jaarSel.value));
   periSel.innerHTML = (gefilterd.length ? '' : '<option value="">— geen periodes —</option>') +
     gefilterd.map(p => `<option value="${p.id}">${periodeNaam(p)}</option>`).join('');
-  laadDashboard();
+  if (!skipDashboard) laadDashboard();
 }
 
 function openModalPeriode(id) {
@@ -1058,7 +1058,7 @@ async function startApp() {
     const huidig = allPeriodes.find(p => p.start_datum <= vandaag && (!p.eind_datum || p.eind_datum >= vandaag))
       || allPeriodes[allPeriodes.length - 1];
     document.getElementById('jaar-select').value = huidig.start_datum.slice(0, 4);
-    filterPeriodesByJaar();
+    filterPeriodesByJaar(true); // populate only, avoid racing laadDashboard call below
     document.getElementById('periode-select').value = huidig.id;
     laadDashboard();
   }
