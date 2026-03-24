@@ -35,7 +35,7 @@ function getCookie(request, name) {
 // ===== autoMatch + CSV parsing (extracted to lib for testability) =====
 
 import { autoMatch } from '../../lib/automatch.js';
-import { parseEuropeanAmount, parseDate, splitCSVRow, detectDelimiter, parseCSV } from '../../lib/csv.js';
+import { parseEuropeanAmount, parseDate, parseCSV } from '../../lib/csv.js';
 
 function mapBankRow(row) {
   const keys = Object.keys(row);

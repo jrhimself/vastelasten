@@ -20,8 +20,9 @@ Een persoonlijke financiële web-app om vaste lasten bij te houden, bankafschrif
 | Backend | Cloudflare Workers (Pages Functions) |
 | Database | Cloudflare D1 (SQLite) |
 | Hosting | Cloudflare Pages |
-| CI/CD | GitHub Actions (test → deploy) |
+| CI/CD | GitHub Actions (lint → test → deploy) |
 | Tests | Vitest |
+| Linting | ESLint v9 |
 
 ## Projectstructuur
 
@@ -40,8 +41,10 @@ Een persoonlijke financiële web-app om vaste lasten bij te houden, bankafschrif
 │   └── csv.test.js              # Unit tests voor CSV parsing
 ├── schema.sql                   # Database schema
 ├── wrangler.toml                # Cloudflare configuratie
+├── eslint.config.js             # ESLint configuratie
+├── CHANGELOG.md                 # Versiehistorie
 └── .github/
-    ├── workflows/deploy.yml     # CI/CD pipeline (test → deploy)
+    ├── workflows/deploy.yml     # CI/CD pipeline (lint → test → deploy)
     └── pull_request_template.md # PR template
 ```
 
@@ -70,8 +73,9 @@ Draait 37 unit tests met Vitest voor de match-logica en CSV parsing.
 
 De app wordt automatisch gedeployd naar Cloudflare Pages bij een push naar elke branch. De GitHub Actions workflow:
 
-1. **test** — Draait alle unit tests (`npm test`)
-2. **deploy** — Deployt via `wrangler-action@v3` naar Cloudflare Pages (alleen als tests slagen)
+1. **lint** — Controleert code op fouten met ESLint (`npm run lint`)
+2. **test** — Draait alle unit tests (`npm test`)
+3. **deploy** — Deployt via `wrangler-action@v3` naar Cloudflare Pages (alleen als lint én tests slagen)
 
 Feature branches krijgen een preview URL (`https://feature-vX-Y-Z.vaste-lasten.pages.dev`). Mergen naar `main` vereist een PR en een geslaagde `test` check.
 
@@ -81,7 +85,7 @@ Feature branches krijgen een preview URL (`https://feature-vX-Y-Z.vaste-lasten.p
 
 ## Versioning
 
-Semantische versienummering (semver). Feature branches worden aangemaakt als `feature/vX.Y.Z`:
+Semantische versienummering (semver). Feature branches worden aangemaakt als `feature/vX.Y.Z`. Alle wijzigingen worden bijgehouden in [`CHANGELOG.md`](CHANGELOG.md).
 
 - **PATCH** (1.0.x) — Bug fixes
 - **MINOR** (1.x.0) — Nieuwe features
