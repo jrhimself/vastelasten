@@ -422,19 +422,24 @@ async function handlePeriodes(path, method, request, env) {
     if (!periode) return Response.json({ error: 'Periode niet gevonden' }, { status: 404 });
 
     const lastId = parseInt(m.last_id);
-    const [{ results: lasten }, { results: transacties }] = await Promise.all([
+    const [{ results: lasten }, { results: transacties }, { results: overgeslagenRijen }, { results: inactiefRijen }] = await Promise.all([
       env.DB.prepare('SELECT * FROM vaste_lasten WHERE actief=1').all(),
       env.DB.prepare(`
         SELECT * FROM bank_transacties
         WHERE periode_id=? AND handmatig_gekoppeld=0 AND genegeerd=0
         AND (gekoppeld_last_id=? OR gekoppeld_last_id IS NULL)
       `).bind(m.id, lastId).all(),
+      env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(m.id).all(),
+      env.DB.prepare('SELECT last_id FROM vaste_last_periode_actief WHERE periode_id=? AND actief=0').bind(m.id).all(),
     ]);
+
+    const uitgesloten = new Set([...overgeslagenRijen, ...inactiefRijen].map(r => r.last_id));
+    const matchbareLasten = lasten.filter(l => !uitgesloten.has(l.id));
 
     let gematcht = 0;
     const updates = [];
     for (const t of transacties) {
-      const matchId = autoMatch(t, lasten, periode);
+      const matchId = autoMatch(t, matchbareLasten, periode);
       if (t.gekoppeld_last_id === lastId || matchId === lastId) {
         updates.push(env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=? WHERE id=?').bind(matchId ?? null, t.id));
         if (matchId === lastId) gematcht++;
@@ -449,14 +454,19 @@ async function handlePeriodes(path, method, request, env) {
     const periode = await env.DB.prepare('SELECT * FROM periodes WHERE id=?').bind(m.id).first();
     if (!periode) return Response.json({ error: 'Periode niet gevonden' }, { status: 404 });
 
-    const [{ results: lasten }, { results: transacties }] = await Promise.all([
+    const [{ results: lasten }, { results: transacties }, { results: overgeslagenRijen }, { results: inactiefRijen }] = await Promise.all([
       env.DB.prepare('SELECT * FROM vaste_lasten WHERE actief=1').all(),
       env.DB.prepare('SELECT * FROM bank_transacties WHERE periode_id=? AND handmatig_gekoppeld=0 AND genegeerd=0').bind(m.id).all(),
+      env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(m.id).all(),
+      env.DB.prepare('SELECT last_id FROM vaste_last_periode_actief WHERE periode_id=? AND actief=0').bind(m.id).all(),
     ]);
+
+    const uitgesloten = new Set([...overgeslagenRijen, ...inactiefRijen].map(r => r.last_id));
+    const matchbareLasten = lasten.filter(l => !uitgesloten.has(l.id));
 
     let gematcht = 0;
     const updates = transacties.map(t => {
-      const lastId = autoMatch(t, lasten, periode);
+      const lastId = autoMatch(t, matchbareLasten, periode);
       if (lastId) gematcht++;
       return env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=? WHERE id=?').bind(lastId ?? null, t.id);
     });
