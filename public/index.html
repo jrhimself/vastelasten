@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vaste Lasten</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=1.1.0">
 </head>
 <body>
 
@@ -40,6 +40,7 @@
       </nav>
     </div>
 
+    <div class="sidebar-version">v1.1.0</div>
   </aside>
 
   <!-- CONTENT -->
@@ -196,7 +197,7 @@
         </div>
         <div>
           <label>Bedrag (€) *</label>
-          <input type="number" id="last-bedrag" step="0.01" min="0" required>
+          <input type="number" id="last-bedrag" step="0.01" min="0" placeholder="0.00" required>
         </div>
         <div>
           <label>Verwachte dag (1-31)</label>
@@ -236,7 +237,7 @@
         </div>
         <div>
           <label>Bedrag (€) *</label>
-          <input type="number" id="nltv-bedrag" step="0.01" min="0" required>
+          <input type="number" id="nltv-bedrag" step="0.01" min="0" placeholder="0.00" required>
         </div>
         <div>
           <label>Verwachte dag (1-31)</label>
@@ -409,6 +410,6 @@
 </div>
 
 <script src="chart.min.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=1.1.0"></script>
 </body>
 </html>
