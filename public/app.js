@@ -136,7 +136,7 @@ function openModalLast(id) {
     document.getElementById('modal-last-titel').textContent = 'Vaste last bewerken';
     document.getElementById('last-id').value = l.id;
     document.getElementById('last-naam').value = l.naam;
-    document.getElementById('last-bedrag').value = l.bedrag;
+    document.getElementById('last-bedrag').value = (l.bedrag || 0).toFixed(2);
     document.getElementById('last-dag').value = l.verwachte_dag || '';
     document.getElementById('last-categorie').value = l.categorie || '';
     document.getElementById('last-iban').value = l.iban_tegenrekening || '';
@@ -722,7 +722,7 @@ function openModalNieuweLastVanTransactie(transactieId) {
   if (!t) return;
   document.getElementById('nltv-transactie-id').value = transactieId;
   document.getElementById('nltv-naam').value = t.omschrijving;
-  document.getElementById('nltv-bedrag').value = Math.abs(t.bedrag);
+  document.getElementById('nltv-bedrag').value = Math.abs(t.bedrag).toFixed(2);
   document.getElementById('nltv-iban').value = t.tegenrekening || '';
   document.getElementById('nltv-dag').value = '';
   document.getElementById('nltv-categorie').value = '';
