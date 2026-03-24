@@ -35,6 +35,9 @@ function getCookie(request, name) {
 // ===== autoMatch (inlined from routes/automatch.js) =====
 
 function autoMatch(transactie, lasten, periode) {
+  // Only match debits (afschrijvingen); credits (bijschrijvingen) are never vaste lasten
+  if (transactie.bedrag >= 0) return null;
+
   if (transactie.tegenrekening) {
     const ibanLasten = lasten.filter(l =>
       l.iban_tegenrekening &&
