@@ -9,6 +9,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ### Added
 - `CHANGELOG.md` — version history is now tracked and updated with every PR
+- ESLint v9 with flat config (`eslint.config.js`) — lints `app.js`, `functions/`, `lib/` and `test/`
+- Lint step added to CI pipeline (runs before tests; deploy is blocked on lint errors)
+
+### Fixed
+- Removed unused imports `splitCSVRow` and `detectDelimiter` from `functions/api/[[route]].js`
+- Removed unnecessary escape characters (`\/`) in regex patterns in `lib/csv.js`
+- Implemented missing `geselecteerdeItems()` function in `app.js` (was called but never defined)
 
 ---
 
