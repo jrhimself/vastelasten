@@ -200,6 +200,10 @@ tr:hover td { background: #fafafa; }
 .badge.overgeslagen { background: #fef3c7; color: #92400e; }
 .badge.inactief { background: #f3f4f6; color: #9ca3af; }
 
+/* Rij met afwijkend bedrag t.o.v. verwacht */
+tr.bedrag-afwijking td { background: #fffbeb; }
+tr.bedrag-afwijking:hover td { background: #fef3c7; }
+
 /* Buttons */
 .btn {
   display: inline-flex;
