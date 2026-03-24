@@ -5,6 +5,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ---
 
+## [1.2.7] - 2026-03-24
+
+### Changed
+- CI workflow split into three separate jobs: `lint`, `test`, and `deploy` — lint and test now run in parallel, deploy waits for both to pass
+
+---
+
 ## [1.2.6] - 2026-03-24
 
 ### Fixed

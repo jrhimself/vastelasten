@@ -73,9 +73,8 @@ Draait 37 unit tests met Vitest voor de match-logica en CSV parsing.
 
 De app wordt automatisch gedeployd naar Cloudflare Pages bij een push naar elke branch. De GitHub Actions workflow:
 
-1. **lint** — Controleert code op fouten met ESLint (`npm run lint`)
-2. **test** — Draait alle unit tests (`npm test`)
-3. **deploy** — Deployt via `wrangler-action@v3` naar Cloudflare Pages (alleen als lint én tests slagen)
+1. **lint** en **test** — Draaien parallel: ESLint check + 37 unit tests
+2. **deploy** — Deployt via `wrangler-action@v3` naar Cloudflare Pages (alleen als lint én test slagen)
 
 Feature branches krijgen een preview URL (`https://feature-vX-Y-Z.vaste-lasten.pages.dev`). Mergen naar `main` vereist een PR en een geslaagde `test` check.
 
