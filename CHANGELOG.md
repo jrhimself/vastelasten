@@ -5,6 +5,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ---
 
+## [1.2.6] - 2026-03-24
+
+### Fixed
+- Version number in sidebar and cache-busting strings were not updated to v1.2.5 — corrected to v1.2.6
+
+---
+
 ## [1.2.5] - 2026-03-24
 
 ### Added
