@@ -269,12 +269,9 @@ async function handlePeriodes(path, method, request, env) {
       env.DB.prepare('SELECT * FROM vaste_lasten WHERE actief=1').all(),
       env.DB.prepare('SELECT * FROM bank_transacties WHERE periode_id=? ORDER BY datum').bind(m.id).all(),
       env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(m.id).all(),
-      env.DB.prepare(`
-        SELECT vpa.last_id, vpa.actief, p.start_datum FROM vaste_last_periode_actief vpa
-        JOIN periodes p ON p.id = vpa.periode_id
-        WHERE p.start_datum <= ?
-        ORDER BY p.start_datum DESC
-      `).bind(periode.start_datum).all(),
+      env.DB.prepare(
+        'SELECT last_id, actief FROM vaste_last_periode_actief WHERE periode_id=?'
+      ).bind(m.id).all(),
     ]);
 
     const salarisdag = new Date(periode.start_datum).getDate();
@@ -289,7 +286,7 @@ async function handlePeriodes(path, method, request, env) {
     const vandaag = new Date().toISOString().slice(0, 10);
     const overgeslagenIds = new Set(overgeslagenRijen.map(r => r.last_id));
 
-    // Most-recent override per last: alleOverrides is sorted DESC, first match wins
+    // Per-period override only — deactivation applies to this period only, not future ones
     function getOverride(lastId) {
       return alleOverrides.find(o => o.last_id === lastId) || null;
     }
