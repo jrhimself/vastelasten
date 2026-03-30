@@ -537,32 +537,34 @@ async function handlePeriodes(path, method, request, env) {
 
     const lastId = parseInt(m.last_id);
     const jaar = new Date(periode.start_datum).getFullYear();
-    const [{ results: lasten }, { results: transacties }, { results: overgeslagenRijen }, { results: inactiefRijen }, { results: jaarOverrides }] = await Promise.all([
+    const [{ results: lasten }, { results: jaarOverrides }, { results: volgendePeriodes }] = await Promise.all([
       env.DB.prepare('SELECT * FROM vaste_lasten WHERE actief=1').all(),
-      env.DB.prepare(`
-        SELECT * FROM bank_transacties
-        WHERE periode_id=? AND handmatig_gekoppeld=0 AND genegeerd=0
-        AND (gekoppeld_last_id=? OR gekoppeld_last_id IS NULL)
-      `).bind(m.id, lastId).all(),
-      env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(m.id).all(),
-      env.DB.prepare('SELECT last_id FROM vaste_last_periode_actief WHERE periode_id=? AND actief=0').bind(m.id).all(),
       env.DB.prepare('SELECT * FROM vaste_last_jaar_overrides WHERE jaar=?').bind(jaar).all(),
+      env.DB.prepare("SELECT * FROM periodes WHERE start_datum LIKE ? AND start_datum >= ? ORDER BY start_datum").bind(`${jaar}-%`, periode.start_datum).all(),
     ]);
 
     const effectieveLasten = applyJaarOverridesOpLasten(lasten, jaarOverrides);
-    const uitgesloten = new Set([...overgeslagenRijen, ...inactiefRijen].map(r => r.last_id));
-    const matchbareLasten = effectieveLasten.filter(l => !uitgesloten.has(l.id));
-
     let gematcht = 0;
-    const updates = [];
-    for (const t of transacties) {
-      const matchId = autoMatch(t, matchbareLasten, periode);
-      if (t.gekoppeld_last_id === lastId || matchId === lastId) {
-        updates.push(env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=? WHERE id=?').bind(matchId ?? null, t.id));
-        if (matchId === lastId) gematcht++;
+    const alleUpdates = [];
+
+    for (const p of volgendePeriodes) {
+      const [{ results: transacties }, { results: overgeslagenRijen }, { results: inactiefRijen }] = await Promise.all([
+        env.DB.prepare(`SELECT * FROM bank_transacties WHERE periode_id=? AND handmatig_gekoppeld=0 AND genegeerd=0 AND (gekoppeld_last_id=? OR gekoppeld_last_id IS NULL)`).bind(p.id, lastId).all(),
+        env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(p.id).all(),
+        env.DB.prepare('SELECT last_id FROM vaste_last_periode_actief WHERE periode_id=? AND actief=0').bind(p.id).all(),
+      ]);
+      const uitgesloten = new Set([...overgeslagenRijen, ...inactiefRijen].map(r => r.last_id));
+      const matchbare = effectieveLasten.filter(l => !uitgesloten.has(l.id));
+      for (const t of transacties) {
+        const matchId = autoMatch(t, matchbare, p);
+        if (t.gekoppeld_last_id === lastId || matchId === lastId) {
+          alleUpdates.push(env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=? WHERE id=?').bind(matchId ?? null, t.id));
+          if (matchId === lastId) gematcht++;
+        }
       }
     }
-    if (updates.length) await env.DB.batch(updates);
+
+    for (let i = 0; i < alleUpdates.length; i += 100) await env.DB.batch(alleUpdates.slice(i, i + 100));
     return Response.json({ ok: true, gematcht });
   }
 
@@ -572,26 +574,34 @@ async function handlePeriodes(path, method, request, env) {
     if (!periode) return Response.json({ error: 'Periode niet gevonden' }, { status: 404 });
 
     const jaar = new Date(periode.start_datum).getFullYear();
-    const [{ results: lasten }, { results: transacties }, { results: overgeslagenRijen }, { results: inactiefRijen }, { results: jaarOverrides }] = await Promise.all([
+    const [{ results: lasten }, { results: jaarOverrides }, { results: volgendePeriodes }] = await Promise.all([
       env.DB.prepare('SELECT * FROM vaste_lasten WHERE actief=1').all(),
-      env.DB.prepare('SELECT * FROM bank_transacties WHERE periode_id=? AND handmatig_gekoppeld=0 AND genegeerd=0').bind(m.id).all(),
-      env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(m.id).all(),
-      env.DB.prepare('SELECT last_id FROM vaste_last_periode_actief WHERE periode_id=? AND actief=0').bind(m.id).all(),
       env.DB.prepare('SELECT * FROM vaste_last_jaar_overrides WHERE jaar=?').bind(jaar).all(),
+      env.DB.prepare("SELECT * FROM periodes WHERE start_datum LIKE ? AND start_datum >= ? ORDER BY start_datum").bind(`${jaar}-%`, periode.start_datum).all(),
     ]);
 
     const effectieveLasten = applyJaarOverridesOpLasten(lasten, jaarOverrides);
-    const uitgesloten = new Set([...overgeslagenRijen, ...inactiefRijen].map(r => r.last_id));
-    const matchbareLasten = effectieveLasten.filter(l => !uitgesloten.has(l.id));
+    let gematcht = 0, hermatcht = 0;
+    const alleUpdates = [];
 
-    let gematcht = 0;
-    const updates = transacties.map(t => {
-      const lastId = autoMatch(t, matchbareLasten, periode);
-      if (lastId) gematcht++;
-      return env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=? WHERE id=?').bind(lastId ?? null, t.id);
-    });
-    if (updates.length) await env.DB.batch(updates);
-    return Response.json({ hermatcht: transacties.length, gematcht });
+    for (const p of volgendePeriodes) {
+      const [{ results: transacties }, { results: overgeslagenRijen }, { results: inactiefRijen }] = await Promise.all([
+        env.DB.prepare('SELECT * FROM bank_transacties WHERE periode_id=? AND handmatig_gekoppeld=0 AND genegeerd=0').bind(p.id).all(),
+        env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(p.id).all(),
+        env.DB.prepare('SELECT last_id FROM vaste_last_periode_actief WHERE periode_id=? AND actief=0').bind(p.id).all(),
+      ]);
+      const uitgesloten = new Set([...overgeslagenRijen, ...inactiefRijen].map(r => r.last_id));
+      const matchbare = effectieveLasten.filter(l => !uitgesloten.has(l.id));
+      for (const t of transacties) {
+        const lastId = autoMatch(t, matchbare, p);
+        if (lastId) gematcht++;
+        alleUpdates.push(env.DB.prepare('UPDATE bank_transacties SET gekoppeld_last_id=? WHERE id=?').bind(lastId ?? null, t.id));
+        hermatcht++;
+      }
+    }
+
+    for (let i = 0; i < alleUpdates.length; i += 100) await env.DB.batch(alleUpdates.slice(i, i + 100));
+    return Response.json({ hermatcht, gematcht });
   }
 
   // POST /periodes/:id/markeer/:last_id
@@ -623,14 +633,25 @@ async function handlePeriodes(path, method, request, env) {
     if (!huidigePeriode) return Response.json({ error: 'Periode niet gevonden' }, { status: 404 });
     const jaar = huidigePeriode.start_datum.slice(0, 4);
     const { results: volgendePeriodes } = await env.DB.prepare(
-      "SELECT id FROM periodes WHERE start_datum LIKE ? AND start_datum >= ?"
+      "SELECT id FROM periodes WHERE start_datum LIKE ? AND start_datum >= ? ORDER BY start_datum"
     ).bind(`${jaar}-%`, huidigePeriode.start_datum).all();
-    await env.DB.batch(volgendePeriodes.map(p =>
-      env.DB.prepare(`
+
+    const statements = [];
+    for (const p of volgendePeriodes) {
+      // Verwijder nep-markering in alle periodes (incl. huidige)
+      statements.push(env.DB.prepare(`
         DELETE FROM bank_transacties
         WHERE periode_id=? AND gekoppeld_last_id=? AND handmatig_gekoppeld=1 AND (tegenrekening IS NULL OR tegenrekening='')
-      `).bind(p.id, m.last_id)
-    ));
+      `).bind(p.id, m.last_id));
+      // Ontkoppel echte banktransacties in opvolgende periodes (niet de huidige)
+      if (p.id != m.id) {
+        statements.push(env.DB.prepare(`
+          UPDATE bank_transacties SET gekoppeld_last_id=NULL
+          WHERE periode_id=? AND gekoppeld_last_id=? AND handmatig_gekoppeld=0
+        `).bind(p.id, m.last_id));
+      }
+    }
+    for (let i = 0; i < statements.length; i += 100) await env.DB.batch(statements.slice(i, i + 100));
     return Response.json({ ok: true });
   }
 
