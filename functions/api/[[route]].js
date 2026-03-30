@@ -121,12 +121,25 @@ async function handleLasten(path, method, request, env) {
 
   // PUT /lasten/:id/jaar/:jaar  (must be before /lasten/:id)
   if ((m = matchPath('/lasten/:id/jaar/:jaar', path)) && method === 'PUT') {
-    const { naam, bedrag, categorie, verwachte_dag, iban_tegenrekening, omschrijving_patroon } = await request.json();
+    const { naam, bedrag, categorie, verwachte_dag, iban_tegenrekening, omschrijving_patroon, actief } = await request.json();
+    // Preserve existing field values when only toggling actief
+    const bestaand = await env.DB.prepare('SELECT * FROM vaste_last_jaar_overrides WHERE last_id=? AND jaar=?').bind(m.id, m.jaar).first();
+    const globaal = await env.DB.prepare('SELECT * FROM vaste_lasten WHERE id=?').bind(m.id).first();
+    const base = bestaand || globaal || {};
     await env.DB.prepare(`
       INSERT OR REPLACE INTO vaste_last_jaar_overrides
-        (last_id, jaar, naam, bedrag, categorie, verwachte_dag, iban_tegenrekening, omschrijving_patroon)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(m.id, m.jaar, naam, bedrag, categorie || '', verwachte_dag || null, iban_tegenrekening || '', omschrijving_patroon || '').run();
+        (last_id, jaar, naam, bedrag, categorie, verwachte_dag, iban_tegenrekening, omschrijving_patroon, actief)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      m.id, m.jaar,
+      naam ?? base.naam ?? null,
+      bedrag ?? base.bedrag ?? null,
+      categorie ?? base.categorie ?? '',
+      verwachte_dag ?? base.verwachte_dag ?? null,
+      iban_tegenrekening ?? base.iban_tegenrekening ?? '',
+      omschrijving_patroon ?? base.omschrijving_patroon ?? '',
+      actief ?? base.actief ?? null
+    ).run();
     return Response.json({ ok: true });
   }
 
@@ -162,22 +175,33 @@ async function kopieerJaarOverridesIndienNieuw(nieuwJaar, env) {
   ).bind(nieuwJaar).first();
   if (bestaatAl) return;
 
-  const vorigeRow = await env.DB.prepare(
-    'SELECT MAX(jaar) AS jaar FROM vaste_last_jaar_overrides WHERE jaar<?'
-  ).bind(nieuwJaar).first();
-  if (!vorigeRow?.jaar) return;
+  // Zoek dichtstbijzijnde jaar met overrides (verleden of toekomst)
+  const [vorigeRow, volgendeRow] = await Promise.all([
+    env.DB.prepare('SELECT MAX(jaar) AS jaar FROM vaste_last_jaar_overrides WHERE jaar<?').bind(nieuwJaar).first(),
+    env.DB.prepare('SELECT MIN(jaar) AS jaar FROM vaste_last_jaar_overrides WHERE jaar>?').bind(nieuwJaar).first(),
+  ]);
+
+  let bronJaar = null;
+  if (vorigeRow?.jaar && volgendeRow?.jaar) {
+    bronJaar = (nieuwJaar - vorigeRow.jaar <= volgendeRow.jaar - nieuwJaar) ? vorigeRow.jaar : volgendeRow.jaar;
+  } else if (vorigeRow?.jaar) {
+    bronJaar = vorigeRow.jaar;
+  } else if (volgendeRow?.jaar) {
+    bronJaar = volgendeRow.jaar;
+  }
+  if (!bronJaar) return;
 
   const { results: kopie } = await env.DB.prepare(
     'SELECT * FROM vaste_last_jaar_overrides WHERE jaar=?'
-  ).bind(vorigeRow.jaar).all();
+  ).bind(bronJaar).all();
   if (!kopie.length) return;
 
   await env.DB.batch(kopie.map(r =>
     env.DB.prepare(`
       INSERT OR IGNORE INTO vaste_last_jaar_overrides
-        (last_id, jaar, naam, bedrag, categorie, verwachte_dag, iban_tegenrekening, omschrijving_patroon)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(r.last_id, nieuwJaar, r.naam, r.bedrag, r.categorie, r.verwachte_dag, r.iban_tegenrekening, r.omschrijving_patroon)
+        (last_id, jaar, naam, bedrag, categorie, verwachte_dag, iban_tegenrekening, omschrijving_patroon, actief)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(r.last_id, nieuwJaar, r.naam, r.bedrag, r.categorie, r.verwachte_dag, r.iban_tegenrekening, r.omschrijving_patroon, r.actief)
   ));
 }
 
@@ -341,10 +365,16 @@ async function handlePeriodes(path, method, request, env) {
       return alleOverrides.find(o => o.last_id === lastId) || null;
     }
 
-    const overzicht = lasten.map(last => {
+    const jaarVerwijderd = lasten
+      .filter(last => jaarOverrides.find(o => o.last_id === last.id && o.actief === 0))
+      .map(last => ({ ...last, jaar_verwijderd: true }));
+
+    const overzicht = lasten
+      .filter(last => !jaarOverrides.find(o => o.last_id === last.id && o.actief === 0))
+      .map(last => {
       const jaarOverride = jaarOverrides.find(o => o.last_id === last.id);
       const effectief = jaarOverride
-        ? { ...last, ...Object.fromEntries(Object.entries(jaarOverride).filter(([k, v]) => v != null && k !== 'last_id' && k !== 'jaar')) }
+        ? { ...last, ...Object.fromEntries(Object.entries(jaarOverride).filter(([k, v]) => v != null && k !== 'last_id' && k !== 'jaar' && k !== 'actief')) }
         : last;
 
       const override = getOverride(last.id);
@@ -376,7 +406,7 @@ async function handlePeriodes(path, method, request, env) {
     const totaalBetaald = actieveItems.filter(o => o.status === 'betaald').reduce((s, o) => s + o.bedrag, 0);
     const ongekoppeld = transacties.filter(t => !t.gekoppeld_last_id && !t.genegeerd);
 
-    return Response.json({ periode, overzicht, totaalVerwacht, totaalBetaald, transacties: ongekoppeld });
+    return Response.json({ periode, overzicht, jaarVerwijderd, totaalVerwacht, totaalBetaald, transacties: ongekoppeld });
   }
 
   // GET /periodes/:id/alle-ongekoppeld

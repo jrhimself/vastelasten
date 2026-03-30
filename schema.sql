@@ -58,5 +58,6 @@ CREATE TABLE IF NOT EXISTS vaste_last_jaar_overrides (
   verwachte_dag INTEGER,
   iban_tegenrekening TEXT,
   omschrijving_patroon TEXT,
+  actief INTEGER,
   PRIMARY KEY (last_id, jaar)
 );

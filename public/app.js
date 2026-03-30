@@ -1,8 +1,16 @@
+// Versie
+(function() {
+  const base = 'v1.2.8';
+  const versie = window.location.hostname.endsWith('.pages.dev') ? base + '-preview' : base;
+  document.getElementById('app-versie').textContent = versie;
+})();
+
 // State
 let allLasten = [];
 let allPeriodes = [];
 let huidigePeriodeId = null;
 let bewerkJaar = null;
+let dashboardJaarVerwijderd = [];
 let importPreviewData = [];
 let allLastenSelectOptions = '';
 let ongekoppeldeTransacties = [];
@@ -410,7 +418,7 @@ function renderDashboardTabel() {
       menuItems.push(`<button onclick="deactiveerLastInPeriode(${o.id});sluitActiesMenu()">Deactiveren</button>`);
     }
 
-    menuItems.push(`<button class="danger" onclick="verwijderLast(${o.id});sluitActiesMenu()">Verwijderen</button>`);
+    menuItems.push(`<button class="danger" onclick="verwijderLastInJaar(${o.id});sluitActiesMenu()">Verwijderen in dit jaar</button>`);
 
     const dimStijl = o.status === 'inactief' ? ' style="opacity:.45"' : '';
     const bedragAfwijking = o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
@@ -441,6 +449,42 @@ function renderDashboardTabel() {
     </table>`;
 
   renderInactieveLasten();
+  renderJaarVerwijderdLasten();
+}
+
+function renderJaarVerwijderdLasten() {
+  const sectie = document.getElementById('jaar-verwijderd-sectie');
+  if (!huidigePeriodeId || !dashboardJaarVerwijderd.length) { sectie.style.display = 'none'; return; }
+  sectie.style.display = 'block';
+  document.getElementById('jaar-verwijderd-body').innerHTML = dashboardJaarVerwijderd.map(l => `
+    <tr style="opacity:.55">
+      <td><strong>${esc(l.naam)}</strong></td>
+      <td>${euro(l.bedrag)}</td>
+      <td>${esc(l.categorie || '—')}</td>
+      <td style="text-align:right">
+        <button class="btn btn-sm btn-secondary" onclick="activeerLastInJaar(${l.id})">Toevoegen in dit jaar</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function verwijderLastInJaar(id) {
+  if (!huidigePeriodeId) return;
+  const periode = allPeriodes.find(p => p.id === huidigePeriodeId);
+  if (!periode) return;
+  const jaar = new Date(periode.start_datum).getFullYear();
+  if (!confirm(`Vaste last verwijderen uit ${jaar}?`)) return;
+  await api(`/api/lasten/${id}/jaar/${jaar}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actief: 0 }) });
+  laadDashboard();
+}
+
+async function activeerLastInJaar(id) {
+  if (!huidigePeriodeId) return;
+  const periode = allPeriodes.find(p => p.id === huidigePeriodeId);
+  if (!periode) return;
+  const jaar = new Date(periode.start_datum).getFullYear();
+  await api(`/api/lasten/${id}/jaar/${jaar}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actief: 1 }) });
+  laadDashboard();
 }
 
 function renderInactieveLasten() {
@@ -472,6 +516,7 @@ async function laadDashboard() {
     document.getElementById('dashboard-acties').style.display = 'none';
     document.getElementById('dashboard-grafieken').style.display = 'none';
     document.getElementById('inactieve-lasten-sectie').style.display = 'none';
+    document.getElementById('jaar-verwijderd-sectie').style.display = 'none';
     return;
   }
 
@@ -485,6 +530,7 @@ async function laadDashboard() {
   document.getElementById('dashboard-grafieken').style.display = 'grid';
 
   dashboardOverzicht = data.overzicht;
+  dashboardJaarVerwijderd = data.jaarVerwijderd || [];
   vulCategorieFilter();
   renderDashboardTabel();
 
