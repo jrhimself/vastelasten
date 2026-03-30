@@ -182,6 +182,7 @@ async function submitLast(e) {
   };
   if (id && bewerkJaar) {
     await api(`/api/lasten/${id}/jaar/${bewerkJaar}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (huidigePeriodeId) await api(`/api/periodes/${huidigePeriodeId}/hermatchen`, { method: 'POST' });
   } else if (id) {
     await api(`/api/lasten/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   } else {

@@ -643,11 +643,11 @@ async function handlePeriodes(path, method, request, env) {
         DELETE FROM bank_transacties
         WHERE periode_id=? AND gekoppeld_last_id=? AND handmatig_gekoppeld=1 AND (tegenrekening IS NULL OR tegenrekening='')
       `).bind(p.id, m.last_id));
-      // Ontkoppel echte banktransacties in opvolgende periodes (niet de huidige)
+      // Ontkoppel echte banktransacties in opvolgende periodes (niet de huidige), ongeacht hoe gekoppeld
       if (p.id != m.id) {
         statements.push(env.DB.prepare(`
-          UPDATE bank_transacties SET gekoppeld_last_id=NULL
-          WHERE periode_id=? AND gekoppeld_last_id=? AND handmatig_gekoppeld=0
+          UPDATE bank_transacties SET gekoppeld_last_id=NULL, handmatig_gekoppeld=0
+          WHERE periode_id=? AND gekoppeld_last_id=?
         `).bind(p.id, m.last_id));
       }
     }
