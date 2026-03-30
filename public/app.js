@@ -162,6 +162,7 @@ function openModalLast(id, vanuitDashboard = false) {
     document.getElementById('last-categorie').value = l.categorie || '';
     document.getElementById('last-iban').value = l.iban_tegenrekening || '';
     document.getElementById('last-patroon').value = l.omschrijving_patroon || '';
+    document.getElementById('last-afwijking').value = l.afwijking_drempel != null ? l.afwijking_drempel : '';
   }
   openModal('modal-last');
 }
@@ -176,6 +177,7 @@ async function submitLast(e) {
     categorie: document.getElementById('last-categorie').value,
     iban_tegenrekening: document.getElementById('last-iban').value,
     omschrijving_patroon: document.getElementById('last-patroon').value,
+    afwijking_drempel: parseFloat(document.getElementById('last-afwijking').value) || null,
     actief: 1
   };
   if (id && bewerkJaar) {
@@ -421,8 +423,9 @@ function renderDashboardTabel() {
     menuItems.push(`<button class="danger" onclick="verwijderLastInJaar(${o.id});sluitActiesMenu()">Verwijderen in dit jaar</button>`);
 
     const dimStijl = o.status === 'inactief' ? ' style="opacity:.45"' : '';
+    const afwijkingDrempel = o.afwijking_drempel ?? 0.01;
     const bedragAfwijking = o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
-      Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > 0.01;
+      Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > afwijkingDrempel;
     const acties = `
       <div class="acties-menu">
         <button class="acties-btn" onclick="toggleActiesMenu(this, event)">•••</button>
@@ -449,23 +452,6 @@ function renderDashboardTabel() {
     </table>`;
 
   renderInactieveLasten();
-  renderJaarVerwijderdLasten();
-}
-
-function renderJaarVerwijderdLasten() {
-  const sectie = document.getElementById('jaar-verwijderd-sectie');
-  if (!huidigePeriodeId || !dashboardJaarVerwijderd.length) { sectie.style.display = 'none'; return; }
-  sectie.style.display = 'block';
-  document.getElementById('jaar-verwijderd-body').innerHTML = dashboardJaarVerwijderd.map(l => `
-    <tr style="opacity:.55">
-      <td><strong>${esc(l.naam)}</strong></td>
-      <td>${euro(l.bedrag)}</td>
-      <td>${esc(l.categorie || '—')}</td>
-      <td style="text-align:right">
-        <button class="btn btn-sm btn-secondary" onclick="activeerLastInJaar(${l.id})">Toevoegen in dit jaar</button>
-      </td>
-    </tr>
-  `).join('');
 }
 
 async function verwijderLastInJaar(id) {
@@ -478,14 +464,6 @@ async function verwijderLastInJaar(id) {
   laadDashboard();
 }
 
-async function activeerLastInJaar(id) {
-  if (!huidigePeriodeId) return;
-  const periode = allPeriodes.find(p => p.id === huidigePeriodeId);
-  if (!periode) return;
-  const jaar = new Date(periode.start_datum).getFullYear();
-  await api(`/api/lasten/${id}/jaar/${jaar}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actief: 1 }) });
-  laadDashboard();
-}
 
 function renderInactieveLasten() {
   const sectie = document.getElementById('inactieve-lasten-sectie');
@@ -516,7 +494,6 @@ async function laadDashboard() {
     document.getElementById('dashboard-acties').style.display = 'none';
     document.getElementById('dashboard-grafieken').style.display = 'none';
     document.getElementById('inactieve-lasten-sectie').style.display = 'none';
-    document.getElementById('jaar-verwijderd-sectie').style.display = 'none';
     return;
   }
 

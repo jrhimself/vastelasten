@@ -121,15 +121,15 @@ async function handleLasten(path, method, request, env) {
 
   // PUT /lasten/:id/jaar/:jaar  (must be before /lasten/:id)
   if ((m = matchPath('/lasten/:id/jaar/:jaar', path)) && method === 'PUT') {
-    const { naam, bedrag, categorie, verwachte_dag, iban_tegenrekening, omschrijving_patroon, actief } = await request.json();
-    // Preserve existing field values when only toggling actief
+    const { naam, bedrag, categorie, verwachte_dag, iban_tegenrekening, omschrijving_patroon, actief, afwijking_drempel } = await request.json();
+    // Preserve existing field values when only updating one field
     const bestaand = await env.DB.prepare('SELECT * FROM vaste_last_jaar_overrides WHERE last_id=? AND jaar=?').bind(m.id, m.jaar).first();
     const globaal = await env.DB.prepare('SELECT * FROM vaste_lasten WHERE id=?').bind(m.id).first();
     const base = bestaand || globaal || {};
     await env.DB.prepare(`
       INSERT OR REPLACE INTO vaste_last_jaar_overrides
-        (last_id, jaar, naam, bedrag, categorie, verwachte_dag, iban_tegenrekening, omschrijving_patroon, actief)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (last_id, jaar, naam, bedrag, categorie, verwachte_dag, iban_tegenrekening, omschrijving_patroon, actief, afwijking_drempel)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       m.id, m.jaar,
       naam ?? base.naam ?? null,
@@ -138,18 +138,19 @@ async function handleLasten(path, method, request, env) {
       verwachte_dag ?? base.verwachte_dag ?? null,
       iban_tegenrekening ?? base.iban_tegenrekening ?? '',
       omschrijving_patroon ?? base.omschrijving_patroon ?? '',
-      actief ?? base.actief ?? null
+      actief ?? base.actief ?? null,
+      afwijking_drempel !== undefined ? afwijking_drempel : (base.afwijking_drempel ?? null)
     ).run();
     return Response.json({ ok: true });
   }
 
   // PUT /lasten/:id
   if ((m = matchPath('/lasten/:id', path)) && method === 'PUT') {
-    const { naam, bedrag, categorie, verwachte_dag, iban_tegenrekening, omschrijving_patroon, actief } = await request.json();
+    const { naam, bedrag, categorie, verwachte_dag, iban_tegenrekening, omschrijving_patroon, actief, afwijking_drempel } = await request.json();
     await env.DB.prepare(`
-      UPDATE vaste_lasten SET naam=?, bedrag=?, categorie=?, verwachte_dag=?, iban_tegenrekening=?, omschrijving_patroon=?, actief=?
+      UPDATE vaste_lasten SET naam=?, bedrag=?, categorie=?, verwachte_dag=?, iban_tegenrekening=?, omschrijving_patroon=?, actief=?, afwijking_drempel=?
       WHERE id=?
-    `).bind(naam, bedrag, categorie || '', verwachte_dag || null, iban_tegenrekening || '', omschrijving_patroon || '', actief ?? 1, m.id).run();
+    `).bind(naam, bedrag, categorie || '', verwachte_dag || null, iban_tegenrekening || '', omschrijving_patroon || '', actief ?? 1, afwijking_drempel ?? null, m.id).run();
     return Response.json({ ok: true });
   }
 
@@ -183,6 +184,7 @@ function applyJaarOverridesOpLasten(lasten, jaarOverrides) {
       if (o.verwachte_dag != null) merged.verwachte_dag = o.verwachte_dag;
       if (o.iban_tegenrekening != null) merged.iban_tegenrekening = o.iban_tegenrekening;
       if (o.omschrijving_patroon != null) merged.omschrijving_patroon = o.omschrijving_patroon;
+      if (o.afwijking_drempel != null) merged.afwijking_drempel = o.afwijking_drempel;
       return merged;
     });
 }
@@ -217,9 +219,9 @@ async function kopieerJaarOverridesIndienNieuw(nieuwJaar, env) {
   await env.DB.batch(kopie.map(r =>
     env.DB.prepare(`
       INSERT OR IGNORE INTO vaste_last_jaar_overrides
-        (last_id, jaar, naam, bedrag, categorie, verwachte_dag, iban_tegenrekening, omschrijving_patroon, actief)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(r.last_id, nieuwJaar, r.naam, r.bedrag, r.categorie, r.verwachte_dag, r.iban_tegenrekening, r.omschrijving_patroon, r.actief)
+        (last_id, jaar, naam, bedrag, categorie, verwachte_dag, iban_tegenrekening, omschrijving_patroon, actief, afwijking_drempel)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(r.last_id, nieuwJaar, r.naam, r.bedrag, r.categorie, r.verwachte_dag, r.iban_tegenrekening, r.omschrijving_patroon, r.actief, r.afwijking_drempel)
   ));
 }
 
@@ -617,10 +619,18 @@ async function handlePeriodes(path, method, request, env) {
 
   // DELETE /periodes/:id/markeer/:last_id
   if ((m = matchPath('/periodes/:id/markeer/:last_id', path)) && method === 'DELETE') {
-    await env.DB.prepare(`
-      DELETE FROM bank_transacties
-      WHERE periode_id=? AND gekoppeld_last_id=? AND handmatig_gekoppeld=1 AND (tegenrekening IS NULL OR tegenrekening='')
-    `).bind(m.id, m.last_id).run();
+    const huidigePeriode = await env.DB.prepare('SELECT start_datum FROM periodes WHERE id=?').bind(m.id).first();
+    if (!huidigePeriode) return Response.json({ error: 'Periode niet gevonden' }, { status: 404 });
+    const jaar = huidigePeriode.start_datum.slice(0, 4);
+    const { results: volgendePeriodes } = await env.DB.prepare(
+      "SELECT id FROM periodes WHERE start_datum LIKE ? AND start_datum >= ?"
+    ).bind(`${jaar}-%`, huidigePeriode.start_datum).all();
+    await env.DB.batch(volgendePeriodes.map(p =>
+      env.DB.prepare(`
+        DELETE FROM bank_transacties
+        WHERE periode_id=? AND gekoppeld_last_id=? AND handmatig_gekoppeld=1 AND (tegenrekening IS NULL OR tegenrekening='')
+      `).bind(p.id, m.last_id)
+    ));
     return Response.json({ ok: true });
   }
 

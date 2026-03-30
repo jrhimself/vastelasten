@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS vaste_lasten (
   verwachte_dag INTEGER,
   iban_tegenrekening TEXT DEFAULT '',
   omschrijving_patroon TEXT DEFAULT '',
-  actief INTEGER DEFAULT 1
+  actief INTEGER DEFAULT 1,
+  afwijking_drempel REAL
 );
 
 CREATE TABLE IF NOT EXISTS periodes (
@@ -59,5 +60,6 @@ CREATE TABLE IF NOT EXISTS vaste_last_jaar_overrides (
   iban_tegenrekening TEXT,
   omschrijving_patroon TEXT,
   actief INTEGER,
+  afwijking_drempel REAL,
   PRIMARY KEY (last_id, jaar)
 );
