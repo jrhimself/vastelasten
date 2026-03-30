@@ -407,15 +407,31 @@ async function handlePeriodes(path, method, request, env) {
 
   // POST /periodes/:id/deactiveer-last/:last_id
   if ((m = matchPath('/periodes/:id/deactiveer-last/:last_id', path)) && method === 'POST') {
-    await env.DB.prepare('INSERT OR REPLACE INTO vaste_last_periode_actief (last_id, periode_id, actief) VALUES (?,?,0)')
-      .bind(m.last_id, m.id).run();
+    const huidigePeriode = await env.DB.prepare('SELECT start_datum FROM periodes WHERE id=?').bind(m.id).first();
+    if (!huidigePeriode) return Response.json({ error: 'Periode niet gevonden' }, { status: 404 });
+    const jaar = huidigePeriode.start_datum.slice(0, 4);
+    const { results: volgendePeriodes } = await env.DB.prepare(
+      "SELECT id FROM periodes WHERE start_datum LIKE ? AND start_datum >= ?"
+    ).bind(`${jaar}-%`, huidigePeriode.start_datum).all();
+    await env.DB.batch(volgendePeriodes.map(p =>
+      env.DB.prepare('INSERT OR REPLACE INTO vaste_last_periode_actief (last_id, periode_id, actief) VALUES (?,?,0)')
+        .bind(m.last_id, p.id)
+    ));
     return Response.json({ ok: true });
   }
 
   // POST /periodes/:id/activeer-last/:last_id
   if ((m = matchPath('/periodes/:id/activeer-last/:last_id', path)) && method === 'POST') {
-    await env.DB.prepare('INSERT OR REPLACE INTO vaste_last_periode_actief (last_id, periode_id, actief) VALUES (?,?,1)')
-      .bind(m.last_id, m.id).run();
+    const huidigePeriode = await env.DB.prepare('SELECT start_datum FROM periodes WHERE id=?').bind(m.id).first();
+    if (!huidigePeriode) return Response.json({ error: 'Periode niet gevonden' }, { status: 404 });
+    const jaar = huidigePeriode.start_datum.slice(0, 4);
+    const { results: volgendePeriodes } = await env.DB.prepare(
+      "SELECT id FROM periodes WHERE start_datum LIKE ? AND start_datum >= ?"
+    ).bind(`${jaar}-%`, huidigePeriode.start_datum).all();
+    await env.DB.batch(volgendePeriodes.map(p =>
+      env.DB.prepare('INSERT OR REPLACE INTO vaste_last_periode_actief (last_id, periode_id, actief) VALUES (?,?,1)')
+        .bind(m.last_id, p.id)
+    ));
     return Response.json({ ok: true });
   }
 
