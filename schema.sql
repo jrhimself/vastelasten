@@ -48,3 +48,15 @@ CREATE TABLE IF NOT EXISTS instellingen (
   sleutel TEXT PRIMARY KEY,
   waarde TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS vaste_last_jaar_overrides (
+  last_id INTEGER REFERENCES vaste_lasten(id) ON DELETE CASCADE,
+  jaar INTEGER NOT NULL,
+  bedrag REAL,
+  naam TEXT,
+  categorie TEXT,
+  verwachte_dag INTEGER,
+  iban_tegenrekening TEXT,
+  omschrijving_patroon TEXT,
+  PRIMARY KEY (last_id, jaar)
+);

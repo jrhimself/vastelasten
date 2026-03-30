@@ -2,6 +2,7 @@
 let allLasten = [];
 let allPeriodes = [];
 let huidigePeriodeId = null;
+let bewerkJaar = null;
 let importPreviewData = [];
 let allLastenSelectOptions = '';
 let ongekoppeldeTransacties = [];
@@ -125,15 +126,27 @@ function updateLastenSelect() {
     allLasten.map(l => `<option value="${l.id}">${esc(l.naam)} (${euro(l.bedrag)})</option>`).join('');
 }
 
-function openModalLast(id) {
+function openModalLast(id, vanuitDashboard = false) {
+  bewerkJaar = null;
   document.getElementById('last-id').value = '';
   document.getElementById('form-last').reset();
   document.getElementById('modal-last-titel').textContent = 'Vaste last toevoegen';
 
   if (id) {
-    const l = allLasten.find(x => x.id === id);
+    // Bepaal databron: dashboard (jaar-overrides al gemergd) of globale lijst
+    const vanDashboard = vanuitDashboard && huidigePeriodeId;
+    const l = vanDashboard
+      ? dashboardOverzicht.find(x => x.id === id)
+      : allLasten.find(x => x.id === id);
     if (!l) return;
-    document.getElementById('modal-last-titel').textContent = 'Vaste last bewerken';
+
+    if (vanDashboard) {
+      const periode = allPeriodes.find(p => p.id === huidigePeriodeId);
+      bewerkJaar = periode ? new Date(periode.start_datum).getFullYear() : null;
+    }
+
+    const titelSuffix = bewerkJaar ? ` (${bewerkJaar})` : '';
+    document.getElementById('modal-last-titel').textContent = 'Vaste last bewerken' + titelSuffix;
     document.getElementById('last-id').value = l.id;
     document.getElementById('last-naam').value = l.naam;
     document.getElementById('last-bedrag').value = (l.bedrag || 0).toFixed(2);
@@ -157,7 +170,9 @@ async function submitLast(e) {
     omschrijving_patroon: document.getElementById('last-patroon').value,
     actief: 1
   };
-  if (id) {
+  if (id && bewerkJaar) {
+    await api(`/api/lasten/${id}/jaar/${bewerkJaar}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  } else if (id) {
     await api(`/api/lasten/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   } else {
     await api('/api/lasten', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -376,7 +391,7 @@ function renderDashboardTabel() {
     if (o.status === 'inactief') {
       menuItems.push(`<button onclick="activeerLastInPeriode(${o.id});sluitActiesMenu()">Activeren in deze periode</button>`);
       menuItems.push(`<div class="menu-divider"></div>`);
-      menuItems.push(`<button onclick="openModalLast(${o.id});sluitActiesMenu()">Bewerken</button>`);
+      menuItems.push(`<button onclick="openModalLast(${o.id},true);sluitActiesMenu()">Bewerken</button>`);
     } else {
       if (kanMarkeren) {
         menuItems.push(`<button onclick="markeerBetaald(${o.id});sluitActiesMenu()">✓ Markeer als betaald</button>`);
@@ -391,7 +406,7 @@ function renderDashboardTabel() {
         menuItems.push(`<button onclick="toonMatchDetail(${o.id});sluitActiesMenu()">Bekijk match</button>`);
       }
       menuItems.push(`<div class="menu-divider"></div>`);
-      menuItems.push(`<button onclick="openModalLast(${o.id});sluitActiesMenu()">Bewerken</button>`);
+      menuItems.push(`<button onclick="openModalLast(${o.id},true);sluitActiesMenu()">Bewerken</button>`);
       menuItems.push(`<button onclick="deactiveerLastInPeriode(${o.id});sluitActiesMenu()">Deactiveren</button>`);
     }
 
