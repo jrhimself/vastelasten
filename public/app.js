@@ -836,11 +836,24 @@ async function biedLeerAan(transactieId, lastId, bronTransacties) {
       `"${last.naam}" heeft nog geen IBAN opgeslagen.\n\nWil je "${transactie.tegenrekening}" opslaan zodat toekomstige imports automatisch matchen?`
     );
     if (bevestig) {
+      // Sla globaal op (fallback voor jaren zonder override)
       await api(`/api/lasten/${lastId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...last, iban_tegenrekening: transactie.tegenrekening })
       });
+      // Sla ook op in jaar-override zodat autoMatch met jaar-overrides ook matcht
+      if (huidigePeriodeId) {
+        const periode = allPeriodes.find(p => p.id === huidigePeriodeId);
+        const jaar = periode ? new Date(periode.start_datum).getFullYear() : null;
+        if (jaar) {
+          await api(`/api/lasten/${lastId}/jaar/${jaar}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ iban_tegenrekening: transactie.tegenrekening })
+          });
+        }
+      }
       await laadLasten();
     }
   }
