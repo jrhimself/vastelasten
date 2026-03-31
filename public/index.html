@@ -244,6 +244,10 @@
           <label>Toegestane afwijking bedrag (€)</label>
           <input type="number" id="last-afwijking" step="0.01" min="0" placeholder="bijv. 5">
         </div>
+        <div style="display:flex;align-items:center;gap:8px;padding-top:20px">
+          <input type="checkbox" id="last-variabel" style="width:auto;margin:0">
+          <label for="last-variabel" style="margin:0;font-weight:400">Variabel bedrag (nooit geel markeren)</label>
+        </div>
       </div>
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" onclick="sluitModal('modal-last')">Annuleren</button>
@@ -431,7 +435,8 @@
   <div class="modal" style="width:480px">
     <h3>Match detail — <span id="match-detail-naam" style="font-weight:400;color:#6b7280"></span></h3>
     <div id="match-detail-inhoud"></div>
-    <div class="form-actions">
+    <div class="form-actions" style="flex-wrap:wrap;gap:8px">
+      <button type="button" class="btn btn-secondary" id="btn-accepteer-bedrag" style="display:none" onclick="accepteerAfwijkingBedrag()">Accepteer bedrag</button>
       <button type="button" class="btn btn-danger" id="btn-match-ongedaan" onclick="matchOngedaanVanuitDetail()">Match ongedaan maken</button>
       <button type="button" class="btn btn-secondary" onclick="sluitModal('modal-match-detail')">Sluiten</button>
     </div>

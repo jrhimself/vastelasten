@@ -163,6 +163,7 @@ function openModalLast(id, vanuitDashboard = false) {
     document.getElementById('last-iban').value = l.iban_tegenrekening || '';
     document.getElementById('last-patroon').value = l.omschrijving_patroon || '';
     document.getElementById('last-afwijking').value = l.afwijking_drempel != null ? l.afwijking_drempel : '';
+    document.getElementById('last-variabel').checked = !!l.variabel;
   }
   openModal('modal-last');
 }
@@ -178,9 +179,12 @@ async function submitLast(e) {
     iban_tegenrekening: document.getElementById('last-iban').value,
     omschrijving_patroon: document.getElementById('last-patroon').value,
     afwijking_drempel: parseFloat(document.getElementById('last-afwijking').value) || null,
+    variabel: document.getElementById('last-variabel').checked ? 1 : 0,
     actief: 1
   };
   if (id && bewerkJaar) {
+    const huidigePeriode = allPeriodes.find(p => p.id === huidigePeriodeId);
+    body.vanaf_datum = huidigePeriode ? huidigePeriode.start_datum : '0000-00-00';
     await api(`/api/lasten/${id}/jaar/${bewerkJaar}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (huidigePeriodeId) await api(`/api/periodes/${huidigePeriodeId}/hermatchen`, { method: 'POST' });
   } else if (id) {
@@ -401,7 +405,7 @@ function renderDashboardTabel() {
 
   const rijen = gefilterd.map(o => {
     const afwijkingDrempel = o.afwijking_drempel ?? 0.01;
-    const bedragAfwijking = o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
+    const bedragAfwijking = !o.variabel && o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
       Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > afwijkingDrempel;
 
     if (isAlleMode) {
@@ -617,9 +621,37 @@ function toonMatchDetail(lastId) {
       <tr><td style="padding:6px 0;color:#6b7280;font-size:12px">Transactie-id</td><td style="font-size:12px;color:#9ca3af">#${t.id}</td></tr>
       <tr><td style="padding:6px 0;color:#6b7280;font-size:12px">Gematcht via</td><td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px;${regelbadge}">${regel}</span></td></tr>
     </table>`;
+  const afwijkingDrempel = o.afwijking_drempel ?? 0.01;
+  const heeftAfwijking = !o.variabel && Math.abs(Math.abs(t.bedrag) - o.bedrag) > afwijkingDrempel;
+  const accepteerKnop = document.getElementById('btn-accepteer-bedrag');
+  if (heeftAfwijking) {
+    accepteerKnop.textContent = `Accepteer ${euro(Math.abs(t.bedrag))} als nieuw bedrag`;
+    accepteerKnop.dataset.lastId = lastId;
+    accepteerKnop.style.display = '';
+  } else {
+    accepteerKnop.style.display = 'none';
+  }
+
   document.getElementById('match-detail-naam').textContent = o.naam;
   document.getElementById('btn-match-ongedaan').dataset.transactieId = t.id;
   openModal('modal-match-detail');
+}
+
+async function accepteerAfwijkingBedrag() {
+  const lastId = parseInt(document.getElementById('btn-accepteer-bedrag').dataset.lastId);
+  const o = dashboardOverzicht.find(x => x.id === lastId);
+  if (!o || !o.betaling) return;
+  const periode = allPeriodes.find(p => p.id === huidigePeriodeId);
+  if (!periode) return;
+  const jaar = new Date(periode.start_datum).getFullYear();
+  const nieuwBedrag = Math.abs(o.betaling.bedrag);
+  sluitModal('modal-match-detail');
+  await api(`/api/lasten/${lastId}/jaar/${jaar}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bedrag: nieuwBedrag, vanaf_datum: periode.start_datum })
+  });
+  laadDashboard();
 }
 
 async function matchOngedaanVanuitDetail() {

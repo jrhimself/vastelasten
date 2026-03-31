@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS vaste_lasten (
   iban_tegenrekening TEXT DEFAULT '',
   omschrijving_patroon TEXT DEFAULT '',
   actief INTEGER DEFAULT 1,
-  afwijking_drempel REAL
+  afwijking_drempel REAL,
+  variabel INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS periodes (
@@ -53,6 +54,7 @@ CREATE TABLE IF NOT EXISTS instellingen (
 CREATE TABLE IF NOT EXISTS vaste_last_jaar_overrides (
   last_id INTEGER REFERENCES vaste_lasten(id) ON DELETE CASCADE,
   jaar INTEGER NOT NULL,
+  vanaf_datum TEXT NOT NULL DEFAULT '0000-00-00',
   bedrag REAL,
   naam TEXT,
   categorie TEXT,
@@ -61,5 +63,6 @@ CREATE TABLE IF NOT EXISTS vaste_last_jaar_overrides (
   omschrijving_patroon TEXT,
   actief INTEGER,
   afwijking_drempel REAL,
-  PRIMARY KEY (last_id, jaar)
+  variabel INTEGER,
+  PRIMARY KEY (last_id, jaar, vanaf_datum)
 );
