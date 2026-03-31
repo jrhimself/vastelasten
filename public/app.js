@@ -279,9 +279,10 @@ function vulPeriodeSelect() {
   const gefilterd = allPeriodes.filter(p => p.start_datum.startsWith(huidigJaar));
   const huidigPeriode = periSel.value;
   periSel.innerHTML = (gefilterd.length ? '' : '<option value="">— geen periodes —</option>') +
+    (gefilterd.length ? '<option value="alle">Alle periodes</option>' : '') +
     gefilterd.map(p => `<option value="${p.id}">${periodeNaam(p)}</option>`).join('');
   // Behoud huidige selectie als die nog in de gefilterde lijst zit
-  if (huidigPeriode && gefilterd.find(p => p.id == huidigPeriode)) {
+  if (huidigPeriode && (huidigPeriode === 'alle' || gefilterd.find(p => p.id == huidigPeriode))) {
     periSel.value = huidigPeriode;
   }
 }
@@ -291,6 +292,7 @@ function filterPeriodesByJaar(skipDashboard = false) {
   const periSel = document.getElementById('periode-select');
   const gefilterd = allPeriodes.filter(p => p.start_datum.startsWith(jaarSel.value));
   periSel.innerHTML = (gefilterd.length ? '' : '<option value="">— geen periodes —</option>') +
+    (gefilterd.length ? '<option value="alle">Alle periodes</option>' : '') +
     gefilterd.map(p => `<option value="${p.id}">${periodeNaam(p)}</option>`).join('');
   if (!skipDashboard) laadDashboard();
 }
@@ -379,6 +381,8 @@ function vulCategorieFilter() {
 }
 
 function renderDashboardTabel() {
+  const isAlleMode = document.getElementById('periode-select').value === 'alle';
+
   if (!dashboardOverzicht.length) {
     document.getElementById('dashboard-card').innerHTML = '<div class="empty">Geen actieve vaste lasten. Gebruik + Toevoegen om ze toe te voegen.</div>';
     renderInactieveLasten();
@@ -396,6 +400,23 @@ function renderDashboardTabel() {
   );
 
   const rijen = gefilterd.map(o => {
+    const afwijkingDrempel = o.afwijking_drempel ?? 0.01;
+    const bedragAfwijking = o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
+      Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > afwijkingDrempel;
+
+    if (isAlleMode) {
+      // Alle periodes: read-only, met periode-kolom
+      const periodeLabel = o.periode_start ? periodeNaam({ start_datum: o.periode_start }) : '—';
+      return `<tr${bedragAfwijking ? ' class="bedrag-afwijking"' : ''}>
+        <td><strong>${esc(o.naam)}</strong></td>
+        <td>${periodeLabel}</td>
+        <td>${euro(o.bedrag)}</td>
+        <td>${esc(o.categorie || '—')}</td>
+        <td><span class="badge ${o.status}">${statusLabel(o.status)}</span></td>
+        <td style="font-size:12px;color:#6b7280">${o.betaling && !o.handmatig_betaald ? `${datumNL(o.betaling.datum)} &nbsp; ${euro(o.betaling.bedrag)}` : o.handmatig_betaald ? '<em>handmatig</em>' : '—'}</td>
+      </tr>`;
+    }
+
     const kanMarkeren = o.status !== 'betaald' && o.status !== 'inactief';
     const menuItems = [];
 
@@ -424,9 +445,6 @@ function renderDashboardTabel() {
     menuItems.push(`<button class="danger" onclick="verwijderLastInJaar(${o.id});sluitActiesMenu()">Verwijderen in dit jaar</button>`);
 
     const dimStijl = o.status === 'inactief' ? ' style="opacity:.45"' : '';
-    const afwijkingDrempel = o.afwijking_drempel ?? 0.01;
-    const bedragAfwijking = o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
-      Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > afwijkingDrempel;
     const acties = `
       <div class="acties-menu">
         <button class="acties-btn" onclick="toggleActiesMenu(this, event)">•••</button>
@@ -443,12 +461,17 @@ function renderDashboardTabel() {
     </tr>`;
   }).join('');
 
+  const colspan = isAlleMode ? 6 : 8;
   const geenResultaat = gefilterd.length === 0
-    ? '<tr><td colspan="8" class="empty">Geen resultaten voor deze filter.</td></tr>' : '';
+    ? `<tr><td colspan="${colspan}" class="empty">Geen resultaten voor deze filter.</td></tr>` : '';
+
+  const headers = isAlleMode
+    ? '<th>Naam</th><th>Periode</th><th>Bedrag</th><th>Categorie</th><th>Status</th><th>Afschrijving</th>'
+    : '<th>Naam</th><th>Bedrag</th><th>Categorie</th><th>Dag v/d maand</th><th>Status</th><th>Afschrijving</th><th>Acties</th>';
 
   document.getElementById('dashboard-card').innerHTML = `
     <table>
-      <thead><tr><th>Naam</th><th>Bedrag</th><th>Categorie</th><th>Dag v/d maand</th><th>Status</th><th>Afschrijving</th><th>Acties</th></tr></thead>
+      <thead><tr>${headers}</tr></thead>
       <tbody>${rijen || geenResultaat}</tbody>
     </table>`;
 
@@ -487,9 +510,11 @@ function renderInactieveLasten() {
 
 async function laadDashboard() {
   const sel = document.getElementById('periode-select');
-  huidigePeriodeId = parseInt(sel.value) || null;
+  const selValue = sel.value;
+  const isAlleMode = selValue === 'alle';
+  huidigePeriodeId = isAlleMode ? null : (parseInt(selValue) || null);
 
-  if (!huidigePeriodeId) {
+  if (!huidigePeriodeId && !isAlleMode) {
     document.getElementById('dashboard-card').innerHTML = '<div class="empty">Selecteer of maak een periode aan om te beginnen.</div>';
     document.getElementById('totalen').style.display = 'none';
     document.getElementById('dashboard-acties').style.display = 'none';
@@ -498,23 +523,29 @@ async function laadDashboard() {
     return;
   }
 
-  const data = await api(`/api/periodes/${huidigePeriodeId}/overzicht`);
+  let data;
+  if (isAlleMode) {
+    const jaar = document.getElementById('jaar-select').value;
+    data = await api(`/api/periodes/jaar/${jaar}/overzicht`);
+  } else {
+    data = await api(`/api/periodes/${huidigePeriodeId}/overzicht`);
+  }
 
   document.getElementById('tot-verwacht').textContent = euro(data.totaalVerwacht);
   document.getElementById('tot-betaald').textContent = euro(data.totaalBetaald);
   document.getElementById('tot-open').textContent = euro(data.totaalVerwacht - data.totaalBetaald);
   document.getElementById('totalen').style.display = 'grid';
-  document.getElementById('dashboard-acties').style.display = 'flex';
-  document.getElementById('dashboard-grafieken').style.display = 'grid';
+  document.getElementById('dashboard-acties').style.display = isAlleMode ? 'none' : 'flex';
+  document.getElementById('dashboard-grafieken').style.display = isAlleMode ? 'none' : 'grid';
 
   dashboardOverzicht = data.overzicht;
   dashboardJaarVerwijderd = data.jaarVerwijderd || [];
   vulCategorieFilter();
   renderDashboardTabel();
 
-  ongekoppeldeTransacties = data.transacties;
+  ongekoppeldeTransacties = data.transacties || [];
 
-  laadGrafieken();
+  if (!isAlleMode) laadGrafieken();
 }
 
 async function hermatchenLast(lastId) {

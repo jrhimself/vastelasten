@@ -319,6 +319,75 @@ async function handlePeriodes(path, method, request, env) {
     return Response.json({ aangemaakt, overgeslagen });
   }
 
+  // GET /periodes/jaar/:jaar/overzicht  (must be before /:id patterns)
+  if ((m = matchPath('/periodes/jaar/:jaar/overzicht', path)) && method === 'GET') {
+    const jaar = m.jaar;
+    const [
+      { results: periodes },
+      { results: lasten },
+      { results: jaarOverrides },
+    ] = await Promise.all([
+      env.DB.prepare("SELECT * FROM periodes WHERE start_datum LIKE ? ORDER BY start_datum").bind(`${jaar}-%`).all(),
+      env.DB.prepare('SELECT * FROM vaste_lasten WHERE actief=1').all(),
+      env.DB.prepare('SELECT * FROM vaste_last_jaar_overrides WHERE jaar=?').bind(parseInt(jaar)).all(),
+    ]);
+
+    const effectieveLasten = applyJaarOverridesOpLasten(lasten, jaarOverrides);
+
+    const overzicht = [];
+    let totaalVerwacht = 0, totaalBetaald = 0;
+
+    for (const periode of periodes) {
+      const [
+        { results: transacties },
+        { results: overgeslagenRijen },
+        { results: alleOverrides },
+      ] = await Promise.all([
+        env.DB.prepare('SELECT * FROM bank_transacties WHERE periode_id=? ORDER BY datum').bind(periode.id).all(),
+        env.DB.prepare('SELECT last_id FROM periode_overgeslagen WHERE periode_id=?').bind(periode.id).all(),
+        env.DB.prepare('SELECT last_id, actief FROM vaste_last_periode_actief WHERE periode_id=?').bind(periode.id).all(),
+      ]);
+
+      const overgeslagenIds = new Set(overgeslagenRijen.map(r => r.last_id));
+      const vandaag = new Date().toISOString().slice(0, 10);
+
+      for (const effectief of effectieveLasten) {
+        const override = alleOverrides.find(o => o.last_id === effectief.id);
+        if (override && override.actief === 0) continue; // skip inactieve
+
+        const betaling = transacties.find(t => t.gekoppeld_last_id === effectief.id);
+        let status = 'open';
+        if (betaling) {
+          status = 'betaald';
+        } else if (overgeslagenIds.has(effectief.id)) {
+          status = 'overgeslagen';
+        } else if (effectief.verwachte_dag) {
+          const start = new Date(periode.start_datum);
+          let verwacht = new Date(start);
+          verwacht.setDate(effectief.verwachte_dag);
+          if (verwacht < start) verwacht.setMonth(verwacht.getMonth() + 1);
+          if (verwacht.toISOString().slice(0, 10) > vandaag) status = 'verwacht';
+        }
+
+        const handmatig = betaling ? betaling.handmatig_gekoppeld === 1 && !betaling.tegenrekening : false;
+        totaalVerwacht += effectief.bedrag;
+        if (status === 'betaald') totaalBetaald += effectief.bedrag;
+
+        overzicht.push({
+          ...effectief,
+          status,
+          betaling: betaling || null,
+          handmatig_betaald: handmatig,
+          periode_id: periode.id,
+          periode_naam: `${periode.start_datum} — ${periode.eind_datum || ''}`,
+          periode_start: periode.start_datum,
+        });
+      }
+    }
+
+    return Response.json({ overzicht, totaalVerwacht, totaalBetaald });
+  }
+
   // GET /periodes
   if (path === '/periodes' && method === 'GET') {
     const { results } = await env.DB.prepare('SELECT * FROM periodes ORDER BY start_datum ASC').all();
