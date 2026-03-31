@@ -367,10 +367,11 @@ async function verwijderPeriode(id) {
 // ============================================================
 // DASHBOARD
 // ============================================================
-let dashboardFilter = { categorie: '', zoekterm: '' };
+let dashboardFilter = { categorie: '', status: '', zoekterm: '' };
 
 function filterDashboard() {
   dashboardFilter.categorie = document.getElementById('categorie-filter').value;
+  dashboardFilter.status = document.getElementById('status-filter').value;
   dashboardFilter.zoekterm = document.getElementById('dashboard-zoek').value.toLowerCase().trim();
   renderDashboardTabel();
 }
@@ -406,9 +407,10 @@ function renderDashboardTabel() {
     return;
   }
 
-  const { categorie, zoekterm } = dashboardFilter;
+  const { categorie, status, zoekterm } = dashboardFilter;
   let gefilterd = dashboardOverzicht;
   if (categorie) gefilterd = gefilterd.filter(o => (o.categorie || '') === categorie);
+  if (status) gefilterd = gefilterd.filter(o => o.status === status);
   if (zoekterm) gefilterd = gefilterd.filter(o =>
     o.naam.toLowerCase().includes(zoekterm) ||
     (o.categorie || '').toLowerCase().includes(zoekterm) ||

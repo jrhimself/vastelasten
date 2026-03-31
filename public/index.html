@@ -79,6 +79,14 @@
           <select id="categorie-filter" onchange="filterDashboard()" style="width:auto;min-width:150px">
             <option value="">Alle categorieën</option>
           </select>
+          <select id="status-filter" onchange="filterDashboard()" style="width:auto;min-width:140px">
+            <option value="">Alle statussen</option>
+            <option value="open">Open</option>
+            <option value="verwacht">Verwacht</option>
+            <option value="betaald">Betaald</option>
+            <option value="overgeslagen">Overgeslagen</option>
+            <option value="inactief">Inactief</option>
+          </select>
           <input type="text" id="dashboard-zoek" placeholder="Zoek op naam of bedrag…" oninput="filterDashboard()" style="flex:1;min-width:180px">
         </div>
       </div>
