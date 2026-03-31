@@ -190,7 +190,11 @@ async function submitLast(e) {
   } else if (id) {
     await api(`/api/lasten/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   } else {
-    await api('/api/lasten', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const res = await api('/api/lasten', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    // Hide in all previous periods of this year so it only propagates forward
+    if (huidigePeriodeId && res.id) {
+      await api(`/api/lasten/${res.id}/activeer-vanaf-periode/${huidigePeriodeId}`, { method: 'POST' });
+    }
   }
   sluitModal('modal-last');
   await laadLasten();
@@ -667,6 +671,7 @@ async function accepteerAfwijkingBedrag() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ bedrag: nieuwBedrag, vanaf_datum: periode.start_datum })
   });
+  await api(`/api/periodes/${huidigePeriodeId}/hermatchen`, { method: 'POST' });
   laadDashboard();
 }
 

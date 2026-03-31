@@ -158,6 +158,24 @@ async function handleLasten(path, method, request, env) {
     return Response.json({ ok: true });
   }
 
+  // POST /lasten/:id/activeer-vanaf-periode/:periode_id
+  // Hides a newly added last in all previous periods of the same year
+  if ((m = matchPath('/lasten/:id/activeer-vanaf-periode/:periode_id', path)) && method === 'POST') {
+    const periode = await env.DB.prepare('SELECT start_datum FROM periodes WHERE id=?').bind(m.periode_id).first();
+    if (!periode) return Response.json({ ok: true });
+    const jaar = periode.start_datum.slice(0, 4);
+    const { results: vorigePeriodes } = await env.DB.prepare(
+      "SELECT id FROM periodes WHERE start_datum LIKE ? AND start_datum < ?"
+    ).bind(`${jaar}-%`, periode.start_datum).all();
+    if (vorigePeriodes.length) {
+      await env.DB.batch(vorigePeriodes.map(p =>
+        env.DB.prepare('INSERT OR IGNORE INTO vaste_last_periode_actief (last_id, periode_id, actief) VALUES (?,?,0)')
+          .bind(m.id, p.id)
+      ));
+    }
+    return Response.json({ ok: true });
+  }
+
   // DELETE /lasten/:id
   if ((m = matchPath('/lasten/:id', path)) && method === 'DELETE') {
     const id = m.id;
