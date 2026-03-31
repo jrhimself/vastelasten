@@ -421,58 +421,37 @@ function renderDashboardTabel() {
     const bedragAfwijking = !o.variabel && o.status === 'betaald' && !o.handmatig_betaald && o.betaling &&
       Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > afwijkingDrempel;
 
-    if (isAlleMode) {
-      const periodeLabel = o.periode_start ? periodeNaam({ start_datum: o.periode_start }) : '—';
-      // In alle-modus: menu met periode-context per rij
-      const menuItems = [];
-      if (o.status === 'betaald' && !o.handmatig_betaald && o.betaling) {
-        menuItems.push(`<button onclick="setAlleModePeriode(${o.periode_id});toonMatchDetail(${o.id},${o.periode_id});sluitActiesMenu()">Bekijk match</button>`);
-      }
-      if (o.status === 'betaald' && o.handmatig_betaald) {
-        menuItems.push(`<button class="danger" onclick="setAlleModePeriode(${o.periode_id});ongedaanMarkering(${o.id});sluitActiesMenu()">Ongedaan maken</button>`);
-      }
-      menuItems.push(`<button onclick="setAlleModePeriode(${o.periode_id});openModalLast(${o.id},true);sluitActiesMenu()">Bewerken</button>`);
-      const acties = `<div class="acties-menu">
-        <button class="acties-btn" onclick="toggleActiesMenu(this, event)">•••</button>
-        <div class="acties-dropdown">${menuItems.join('')}</div>
-      </div>`;
-      return `<tr${bedragAfwijking ? ' class="bedrag-afwijking"' : ''}>
-        <td><strong>${esc(o.naam)}</strong></td>
-        <td>${periodeLabel}</td>
-        <td>${euro(o.bedrag)}</td>
-        <td>${esc(o.categorie || '—')}</td>
-        <td><span class="badge ${o.status}">${statusLabel(o.status)}</span></td>
-        <td style="font-size:12px;color:#6b7280">${o.betaling && !o.handmatig_betaald ? `${datumNL(o.betaling.datum)} &nbsp; ${euro(o.betaling.bedrag)}` : o.handmatig_betaald ? '<em>handmatig</em>' : '—'}</td>
-        <td style="white-space:nowrap">${acties}</td>
-      </tr>`;
-    }
+    // ctx: set period context first when in alle-modus
+    const ctx = isAlleMode ? `setAlleModePeriode(${o.periode_id});` : '';
+    const periodeLabel = isAlleMode && o.periode_start ? periodeNaam({ start_datum: o.periode_start }) : null;
 
     const kanMarkeren = o.status !== 'betaald' && o.status !== 'inactief';
     const menuItems = [];
 
     if (o.status === 'inactief') {
-      menuItems.push(`<button onclick="activeerLastInPeriode(${o.id});sluitActiesMenu()">Activeren in deze periode</button>`);
+      menuItems.push(`<button onclick="${ctx}activeerLastInPeriode(${o.id});sluitActiesMenu()">Activeren in deze periode</button>`);
       menuItems.push(`<div class="menu-divider"></div>`);
-      menuItems.push(`<button onclick="openModalLast(${o.id},true);sluitActiesMenu()">Bewerken</button>`);
+      menuItems.push(`<button onclick="${ctx}openModalLast(${o.id},true);sluitActiesMenu()">Bewerken</button>`);
     } else {
       if (kanMarkeren) {
-        menuItems.push(`<button onclick="markeerBetaald(${o.id});sluitActiesMenu()">✓ Markeer als betaald</button>`);
+        menuItems.push(`<button onclick="${ctx}markeerBetaald(${o.id});sluitActiesMenu()">✓ Markeer als betaald</button>`);
         menuItems.push(`<div class="menu-divider"></div>`);
-        menuItems.push(`<button onclick="openZoekTransactie(${o.id}, '${esc(o.naam)}');sluitActiesMenu()">Zoek transactie</button>`);
-        menuItems.push(`<button onclick="hermatchenLast(${o.id});sluitActiesMenu()">↺ Hermatchen</button>`);
+        menuItems.push(`<button onclick="${ctx}openZoekTransactie(${o.id}, '${esc(o.naam)}');sluitActiesMenu()">Zoek transactie</button>`);
+        menuItems.push(`<button onclick="${ctx}hermatchenLast(${o.id});sluitActiesMenu()">↺ Hermatchen</button>`);
       }
       if (o.status === 'betaald' && o.handmatig_betaald) {
-        menuItems.push(`<button class="danger" onclick="ongedaanMarkering(${o.id});sluitActiesMenu()">Ongedaan maken</button>`);
+        menuItems.push(`<button class="danger" onclick="${ctx}ongedaanMarkering(${o.id});sluitActiesMenu()">Ongedaan maken</button>`);
       }
       if (o.status === 'betaald' && !o.handmatig_betaald && o.betaling) {
-        menuItems.push(`<button onclick="toonMatchDetail(${o.id});sluitActiesMenu()">Bekijk match</button>`);
+        const periodeArg = isAlleMode ? `,${o.periode_id}` : '';
+        menuItems.push(`<button onclick="${ctx}toonMatchDetail(${o.id}${periodeArg});sluitActiesMenu()">Bekijk match</button>`);
       }
       menuItems.push(`<div class="menu-divider"></div>`);
-      menuItems.push(`<button onclick="openModalLast(${o.id},true);sluitActiesMenu()">Bewerken</button>`);
-      menuItems.push(`<button onclick="deactiveerLastInPeriode(${o.id});sluitActiesMenu()">Deactiveren</button>`);
+      menuItems.push(`<button onclick="${ctx}openModalLast(${o.id},true);sluitActiesMenu()">Bewerken</button>`);
+      menuItems.push(`<button onclick="${ctx}deactiveerLastInPeriode(${o.id});sluitActiesMenu()">Deactiveren</button>`);
     }
 
-    menuItems.push(`<button class="danger" onclick="verwijderLastInJaar(${o.id});sluitActiesMenu()">Verwijderen in dit jaar</button>`);
+    menuItems.push(`<button class="danger" onclick="${ctx}verwijderLastInJaar(${o.id});sluitActiesMenu()">Verwijderen in dit jaar</button>`);
 
     const dimStijl = o.status === 'inactief' ? ' style="opacity:.45"' : '';
     const acties = `
@@ -480,23 +459,26 @@ function renderDashboardTabel() {
         <button class="acties-btn" onclick="toggleActiesMenu(this, event)">•••</button>
         <div class="acties-dropdown">${menuItems.join('')}</div>
       </div>`;
+    const vierdeKolom = isAlleMode
+      ? `<td${dimStijl}>${periodeLabel || '—'}</td>`
+      : `<td${dimStijl}>${o.verwachte_dag ? o.verwachte_dag + 'e' : '—'}</td>`;
     return `<tr${bedragAfwijking ? ' class="bedrag-afwijking"' : ''}>
       <td${dimStijl}><strong>${esc(o.naam)}</strong></td>
       <td${dimStijl}>${euro(o.bedrag)}</td>
       <td${dimStijl}>${esc(o.categorie || '—')}</td>
-      <td${dimStijl}>${o.verwachte_dag ? o.verwachte_dag + 'e' : '—'}</td>
+      ${vierdeKolom}
       <td${dimStijl}><span class="badge ${o.status}">${statusLabel(o.status)}</span></td>
       <td${dimStijl} style="font-size:12px;color:#6b7280">${o.betaling && !o.handmatig_betaald ? `${datumNL(o.betaling.datum)} &nbsp; ${euro(o.betaling.bedrag)}` : o.handmatig_betaald ? '<em>handmatig</em>' : '—'}</td>
       <td style="white-space:nowrap">${acties}</td>
     </tr>`;
   }).join('');
 
-  const colspan = isAlleMode ? 7 : 8;
+  const colspan = 7;
   const geenResultaat = gefilterd.length === 0
     ? `<tr><td colspan="${colspan}" class="empty">Geen resultaten voor deze filter.</td></tr>` : '';
 
   const headers = isAlleMode
-    ? '<th>Naam</th><th>Periode</th><th>Bedrag</th><th>Categorie</th><th>Status</th><th>Afschrijving</th><th>Acties</th>'
+    ? '<th>Naam</th><th>Bedrag</th><th>Categorie</th><th>Periode</th><th>Status</th><th>Afschrijving</th><th>Acties</th>'
     : '<th>Naam</th><th>Bedrag</th><th>Categorie</th><th>Dag v/d maand</th><th>Status</th><th>Afschrijving</th><th>Acties</th>';
 
   document.getElementById('dashboard-card').innerHTML = `
