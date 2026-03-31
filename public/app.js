@@ -384,6 +384,19 @@ function vulCategorieFilter() {
   if (cats.includes(huidigCat)) sel.value = huidigCat;
 }
 
+// Tijdelijk periode instellen vanuit "alle periodes" modus voor periode-specifieke acties
+function setAlleModePeriode(periodeId) {
+  huidigePeriodeId = periodeId;
+}
+
+function toggleGrafieken(btn) {
+  const inhoud = document.getElementById('grafieken-inhoud');
+  const pijl = document.getElementById('grafieken-pijl');
+  const ingeklapt = inhoud.style.display === 'none';
+  inhoud.style.display = ingeklapt ? '' : 'none';
+  pijl.textContent = ingeklapt ? '▼' : '▶';
+}
+
 function renderDashboardTabel() {
   const isAlleMode = document.getElementById('periode-select').value === 'alle';
 
@@ -409,8 +422,20 @@ function renderDashboardTabel() {
       Math.abs(Math.abs(o.betaling.bedrag) - o.bedrag) > afwijkingDrempel;
 
     if (isAlleMode) {
-      // Alle periodes: read-only, met periode-kolom
       const periodeLabel = o.periode_start ? periodeNaam({ start_datum: o.periode_start }) : '—';
+      // In alle-modus: menu met periode-context per rij
+      const menuItems = [];
+      if (o.status === 'betaald' && !o.handmatig_betaald && o.betaling) {
+        menuItems.push(`<button onclick="setAlleModePeriode(${o.periode_id});toonMatchDetail(${o.id});sluitActiesMenu()">Bekijk match</button>`);
+      }
+      if (o.status === 'betaald' && o.handmatig_betaald) {
+        menuItems.push(`<button class="danger" onclick="setAlleModePeriode(${o.periode_id});ongedaanMarkering(${o.id});sluitActiesMenu()">Ongedaan maken</button>`);
+      }
+      menuItems.push(`<button onclick="setAlleModePeriode(${o.periode_id});openModalLast(${o.id},true);sluitActiesMenu()">Bewerken</button>`);
+      const acties = `<div class="acties-menu">
+        <button class="acties-btn" onclick="toggleActiesMenu(this, event)">•••</button>
+        <div class="acties-dropdown">${menuItems.join('')}</div>
+      </div>`;
       return `<tr${bedragAfwijking ? ' class="bedrag-afwijking"' : ''}>
         <td><strong>${esc(o.naam)}</strong></td>
         <td>${periodeLabel}</td>
@@ -418,6 +443,7 @@ function renderDashboardTabel() {
         <td>${esc(o.categorie || '—')}</td>
         <td><span class="badge ${o.status}">${statusLabel(o.status)}</span></td>
         <td style="font-size:12px;color:#6b7280">${o.betaling && !o.handmatig_betaald ? `${datumNL(o.betaling.datum)} &nbsp; ${euro(o.betaling.bedrag)}` : o.handmatig_betaald ? '<em>handmatig</em>' : '—'}</td>
+        <td style="white-space:nowrap">${acties}</td>
       </tr>`;
     }
 
@@ -465,12 +491,12 @@ function renderDashboardTabel() {
     </tr>`;
   }).join('');
 
-  const colspan = isAlleMode ? 6 : 8;
+  const colspan = isAlleMode ? 7 : 8;
   const geenResultaat = gefilterd.length === 0
     ? `<tr><td colspan="${colspan}" class="empty">Geen resultaten voor deze filter.</td></tr>` : '';
 
   const headers = isAlleMode
-    ? '<th>Naam</th><th>Periode</th><th>Bedrag</th><th>Categorie</th><th>Status</th><th>Afschrijving</th>'
+    ? '<th>Naam</th><th>Periode</th><th>Bedrag</th><th>Categorie</th><th>Status</th><th>Afschrijving</th><th>Acties</th>'
     : '<th>Naam</th><th>Bedrag</th><th>Categorie</th><th>Dag v/d maand</th><th>Status</th><th>Afschrijving</th><th>Acties</th>';
 
   document.getElementById('dashboard-card').innerHTML = `
@@ -540,7 +566,7 @@ async function laadDashboard() {
   document.getElementById('tot-open').textContent = euro(data.totaalVerwacht - data.totaalBetaald);
   document.getElementById('totalen').style.display = 'grid';
   document.getElementById('dashboard-acties').style.display = isAlleMode ? 'none' : 'flex';
-  document.getElementById('dashboard-grafieken').style.display = isAlleMode ? 'none' : 'grid';
+  document.getElementById('dashboard-grafieken').style.display = 'block';
 
   dashboardOverzicht = data.overzicht;
   dashboardJaarVerwijderd = data.jaarVerwijderd || [];
@@ -549,7 +575,7 @@ async function laadDashboard() {
 
   ongekoppeldeTransacties = data.transacties || [];
 
-  if (!isAlleMode) laadGrafieken();
+  laadGrafieken();
 }
 
 async function hermatchenLast(lastId) {

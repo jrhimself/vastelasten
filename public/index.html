@@ -98,14 +98,19 @@
         </div>
       </div>
 
-      <div class="grafieken-grid" id="dashboard-grafieken" style="display:none;margin-bottom:16px">
-        <div class="card">
-          <h3 class="chart-titel">Verdeling per categorie</h3>
-          <div class="chart-wrap"><canvas id="chart-categorie"></canvas></div>
-        </div>
-        <div class="card">
-          <h3 class="chart-titel">Verwacht vs betaald per periode</h3>
-          <div class="chart-wrap"><canvas id="chart-periodes"></canvas></div>
+      <div class="grafieken-sectie" id="dashboard-grafieken" style="display:none">
+        <button class="grafieken-toggle" onclick="toggleGrafieken(this)">
+          <span id="grafieken-pijl">▼</span> Grafieken
+        </button>
+        <div class="grafieken-grid" id="grafieken-inhoud">
+          <div class="card">
+            <h3 class="chart-titel">Verdeling per categorie</h3>
+            <div class="chart-wrap"><canvas id="chart-categorie"></canvas></div>
+          </div>
+          <div class="card">
+            <h3 class="chart-titel">Verwacht vs betaald per periode</h3>
+            <div class="chart-wrap"><canvas id="chart-periodes"></canvas></div>
+          </div>
         </div>
       </div>
 
