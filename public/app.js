@@ -426,7 +426,7 @@ function renderDashboardTabel() {
       // In alle-modus: menu met periode-context per rij
       const menuItems = [];
       if (o.status === 'betaald' && !o.handmatig_betaald && o.betaling) {
-        menuItems.push(`<button onclick="setAlleModePeriode(${o.periode_id});toonMatchDetail(${o.id});sluitActiesMenu()">Bekijk match</button>`);
+        menuItems.push(`<button onclick="setAlleModePeriode(${o.periode_id});toonMatchDetail(${o.id},${o.periode_id});sluitActiesMenu()">Bekijk match</button>`);
       }
       if (o.status === 'betaald' && o.handmatig_betaald) {
         menuItems.push(`<button class="danger" onclick="setAlleModePeriode(${o.periode_id});ongedaanMarkering(${o.id});sluitActiesMenu()">Ongedaan maken</button>`);
@@ -614,8 +614,10 @@ async function bulkHermatchen() {
   }
 }
 
-function toonMatchDetail(lastId) {
-  const o = dashboardOverzicht.find(x => x.id === lastId);
+function toonMatchDetail(lastId, periodeId = null) {
+  const o = periodeId
+    ? dashboardOverzicht.find(x => x.id === lastId && x.periode_id === periodeId)
+    : dashboardOverzicht.find(x => x.id === lastId);
   if (!o || !o.betaling) return;
   const t = o.betaling;
 
@@ -653,6 +655,7 @@ function toonMatchDetail(lastId) {
   if (heeftAfwijking) {
     accepteerKnop.textContent = `Accepteer ${euro(Math.abs(t.bedrag))} als nieuw bedrag`;
     accepteerKnop.dataset.lastId = lastId;
+    accepteerKnop.dataset.periodeId = periodeId || '';
     accepteerKnop.style.display = '';
   } else {
     accepteerKnop.style.display = 'none';
@@ -665,7 +668,10 @@ function toonMatchDetail(lastId) {
 
 async function accepteerAfwijkingBedrag() {
   const lastId = parseInt(document.getElementById('btn-accepteer-bedrag').dataset.lastId);
-  const o = dashboardOverzicht.find(x => x.id === lastId);
+  const periodeId = parseInt(document.getElementById('btn-accepteer-bedrag').dataset.periodeId) || null;
+  const o = periodeId
+    ? dashboardOverzicht.find(x => x.id === lastId && x.periode_id === periodeId)
+    : dashboardOverzicht.find(x => x.id === lastId);
   if (!o || !o.betaling) return;
   const periode = allPeriodes.find(p => p.id === huidigePeriodeId);
   if (!periode) return;
