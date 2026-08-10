@@ -32,6 +32,17 @@ function getCookie(request, name) {
   return match ? match[1] : null;
 }
 
+// Session cookie attributes. `Secure` is only sent over HTTPS: browsers drop
+// Secure cookies on plain-HTTP origins, which would break the self-hosted
+// deployment that is reached over http://<lan-ip>:3000.
+function sessionCookieAttributes(request) {
+  const forwardedProto = (request.headers.get('X-Forwarded-Proto') || '').split(',')[0].trim();
+  const isHttps = forwardedProto
+    ? forwardedProto === 'https'
+    : new URL(request.url).protocol === 'https:';
+  return `Path=/; HttpOnly;${isHttps ? ' Secure;' : ''} SameSite=Strict`;
+}
+
 // ===== autoMatch + CSV parsing (extracted to lib for testability) =====
 
 import { autoMatch } from '../../lib/automatch.js';
@@ -1269,7 +1280,7 @@ export async function onRequest(context) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Set-Cookie': `session=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${90 * 24 * 60 * 60}`,
+        'Set-Cookie': `session=${token}; ${sessionCookieAttributes(request)}; Max-Age=${90 * 24 * 60 * 60}`,
       },
     });
   }
@@ -1288,7 +1299,7 @@ export async function onRequest(context) {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Set-Cookie': 'session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0',
+        'Set-Cookie': `session=; ${sessionCookieAttributes(request)}; Max-Age=0`,
       },
     });
   }

@@ -5,6 +5,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 
 ---
 
+## [1.5.8] - 2026-08-10
+
+### Fixed
+- The session cookie no longer sets the `Secure` attribute on plain-HTTP requests. Browsers reject `Secure` cookies on non-HTTPS origins, so on the self-hosted deployment (reached over `http://<lan-ip>:3000`) the login succeeded but the cookie was dropped and every subsequent API call returned `401 Niet ingelogd`, leaving the UI empty. HTTPS deployments are unaffected: `Secure` is still set when the request arrives over HTTPS, determined from `X-Forwarded-Proto` when present and the request URL otherwise
+
+---
+
 ## [1.5.7] - 2026-06-22
 
 ### Fixed
