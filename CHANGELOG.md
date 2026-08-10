@@ -10,6 +10,10 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), versio
 ### Fixed
 - The session cookie no longer sets the `Secure` attribute on plain-HTTP requests. Browsers reject `Secure` cookies on non-HTTPS origins, so on the self-hosted deployment (reached over `http://<lan-ip>:3000`) the login succeeded but the cookie was dropped and every subsequent API call returned `401 Niet ingelogd`, leaving the UI empty. HTTPS deployments are unaffected: `Secure` is still set when the request arrives over HTTPS, determined from `X-Forwarded-Proto` when present and the request URL otherwise
 
+### Removed
+- Automatic deployment to Cloudflare Pages. The maintainer's Pages project and D1 database have been decommissioned in favour of the self-hosted Express server, so the workflow (renamed `deploy.yml` → `ci.yml`) now only runs lint and tests. Cloudflare hosting remains supported as an installation option — see the Cloudflare hosting section in the README to set it up against your own account
+- The maintainer-specific `database_id` in `wrangler.toml`, replaced by a `<your-d1-database-id>` placeholder as the README already instructs
+
 ---
 
 ## [1.5.7] - 2026-06-22
